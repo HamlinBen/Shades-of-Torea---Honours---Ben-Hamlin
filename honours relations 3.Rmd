@@ -1,0 +1,265 @@
+---
+title: "honours relations 3"
+author: "Ben Hamlin"
+date: "2024-09-04"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+```
+
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_data_berd$DNA_sex <- ifelse(torea_data_berd$DNA_sex %in% c("NO SAMPLE", "X"), "NO SAMPLE", torea_data_berd$DNA_sex)
+torea_data_berd$DNA_sex[is.na(torea_data_berd$DNA_sex)] <- "NO SAMPLE"
+#allows for known sex to always appear on top
+torea_data_berd$alpha <- ifelse(torea_data_berd$DNA_sex %in% c("M", "F"), 1, 0.7)
+#check data import 
+str(torea_data_berd)
+table(torea_data_berd$DNA_sex)
+```
+
+```{r}
+#viewing Bill Length compared to traits - continuous
+
+# Bill Length vs torea bill depth by sex
+corr_test_blbd <- cor.test(torea_data_berd$Bill_Depth, torea_data_berd$Bill_Length)
+corr_coeff_blbd <- round(corr_test_blbd$estimate, 2)
+p_value_blbd <- corr_test_blbd$p.value
+p_value_text_blbd <- format.pval(p_value_blbd)
+
+ggplot(torea_data_berd, aes(x = Bill_Depth, y = Bill_Length)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Depth (mm)", y = "Torea Bill Length (g)", color = "Sex", title = "Torea Bill Depth vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_blbd, "P-value:", p_value_text_blbd),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs torea bill Width by sex
+corr_test_blbw <- cor.test(torea_data_berd$Bill_Width, torea_data_berd$Bill_Length)
+corr_coeff_blbw <- round(corr_test_blbw$estimate, 2)
+p_value_blbw <- corr_test_blbw$p.value
+p_value_text_blbw <- format.pval(p_value_blbw)
+
+ggplot(torea_data_berd, aes(x = Bill_Width, y = Bill_Length)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Width (mm)", y = "Bill Length", color = "Sex", title = "Torea Bill Width vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_blbw, "P-value:", p_value_text_blbw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs torea Wing length by sex
+corr_test_blwl <- cor.test(torea_data_berd$Wing_Length, torea_data_berd$Bill_Length)
+corr_coeff_blwl <- round(corr_test_blwl$estimate, 2)
+p_value_blwl <- corr_test_blwl$p.value
+p_value_text_blwl <- format.pval(p_value_blwl)
+
+ggplot(torea_data_berd, aes(x = Wing_Length, y = Bill_Length)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Wing Length (mm)", y = "Bill Length", color = "Sex", title = "Torea wing length vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_blwl, "P-value:", p_value_text_blwl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs torea Tarsus length by sex
+corr_test_bltl <- cor.test(torea_data_berd$Tarsus_Length, torea_data_berd$Bill_Length)
+corr_coeff_bltl <- round(corr_test_bltl$estimate, 2)
+p_value_bltl <- corr_test_bltl$p.value
+p_value_text_bltl <- format.pval(p_value_bltl)
+
+ggplot(torea_data_berd, aes(x = Tarsus_Length, y = Bill_Length)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Tarsus Length (mm)", y = "Bill Length", color = "Sex", title = "Torea tarsus length vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_bltl, "P-value:", p_value_text_bltl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs torea body condition by sex
+corr_test_blbc <- cor.test(torea_data_berd$Body_condition_TL, torea_data_berd$Bill_Length)
+corr_coeff_blbc <- round(corr_test_blbc$estimate, 2)
+p_value_blbc <- corr_test_blbc$p.value
+p_value_text_blbc <- format.pval(p_value_blbc)
+
+ggplot(torea_data_berd, aes(x = Body_condition_TL, y = Bill_Length)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Body Condition", y = "Bill Length", color = "Sex", title = "Torea body condition vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_blbc, "P-value:", p_value_text_blbc),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# assessing body condition compared to categorical variables
+
+# Bill Length vs bill colour by sex
+torea_data_berd_vis1 <- torea_data_berd %>%
+  filter(!is.na(Bill_Colour))
+torea_data_berd_vis1$Bill_Colour <- as.factor(torea_data_berd_vis1$Bill_Colour)
+
+anova_blbc <- aov(Bill_Length ~ Bill_Colour, data = torea_data_berd_vis1)
+anova_sum_blbc <- summary(anova_blbc)[[1]]
+p_value_blbc <- anova_sum_blbc["Bill_Colour", "Pr(>F)"]
+f_value_blbc <- anova_sum_wbc["Bill_Colour", "F value"]
+anova_text_blbc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_blbc, 2), "\n",
+  "p-value = ", format.pval(p_value_blbc)
+)
+
+ggplot(torea_data_berd_vis1, aes(x = Bill_Colour, y = Bill_Length)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Colour", y = "Bill Length", color = "Sex", title = "Torea bill colour vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_blbc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs leg colour by sex
+torea_data_berd_vis2 <- torea_data_berd %>%
+  filter(!is.na(Leg_Colour))
+torea_data_berd_vis2$Leg_Colour <- as.factor(torea_data_berd_vis2$Leg_Colour)
+
+anova_bllc <- aov(Bill_Length ~ Leg_Colour, data = torea_data_berd_vis2)
+anova_sum_bllc <- summary(anova_bllc)[[1]]
+p_value_bllc <- anova_sum_bllc["Leg_Colour", "Pr(>F)"]
+f_value_bllc <- anova_sum_bllc["Leg_Colour", "F value"]
+anova_text_bllc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_bllc, 2), "\n",
+  "p-value = ", format.pval(p_value_bllc)
+)
+
+ggplot(torea_data_berd_vis2, aes(x = Leg_Colour, y = Bill_Length)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Leg Colour", y = "Bill Length", color = "Sex", title = "Torea leg colour vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_bllc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs Iris colour by sex
+torea_data_berd_vis3 <- torea_data_berd %>%
+  filter(!is.na(Iris_Colour))
+torea_data_berd_vis3$Iris_Colour <- as.factor(torea_data_berd_vis3$Iris_Colour)
+
+anova_blic <- aov(Bill_Length ~ Iris_Colour, data = torea_data_berd_vis3)
+anova_sum_blic <- summary(anova_blic)[[1]]
+p_value_blic <- anova_sum_blic["Iris_Colour", "Pr(>F)"]
+f_value_blic <- anova_sum_blic["Iris_Colour", "F value"]
+anova_text_blic <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_blic, 2), "\n",
+  "p-value = ", format.pval(p_value_blic)
+)
+
+ggplot(torea_data_berd_vis3, aes(x = Iris_Colour, y = Bill_Length)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Colour", y = "Bill Length", color = "Sex", title = "Torea iris colour vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_blic,
+    hjust = 1.1, vjust = 5.3, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Bill Length vs iris fleck by sex
+torea_data_berd_vis4 <- torea_data_berd %>%
+  filter(!is.na(Iris_Fleck))
+torea_data_berd_vis4$Iris_Fleck <- as.factor(torea_data_berd_vis4$Iris_Fleck)
+
+anova_blif <- aov(Bill_Length ~ Iris_Fleck, data = torea_data_berd_vis4)
+anova_sum_blif <- summary(anova_blif)[[1]]
+p_value_blif <- anova_sum_blif["Iris_Fleck", "Pr(>F)"]
+f_value_blif <- anova_sum_blif["Iris_Fleck", "F value"]
+anova_text_blif <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_blif, 2), "\n",
+  "p-value = ", format.pval(p_value_blif)
+)
+
+ggplot(torea_data_berd_vis4, aes(x = Iris_Fleck, y = Bill_Length)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Fleck", y = "Bill Length", color = "Sex", title = "Torea iris fleck vs Bill Length") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_blif,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+

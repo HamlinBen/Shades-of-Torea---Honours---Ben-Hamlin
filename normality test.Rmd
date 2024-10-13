@@ -1,0 +1,83 @@
+---
+title: "normality test"
+author: "Ben Hamlin"
+date: "2024-09-10"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#import data
+torea_data_norm <- torea_data_berd
+str(torea_data_norm)
+```
+
+
+```{r}
+#check normality of data
+
+#weight
+#remove NA
+torea_data_norm_we <- na.omit(torea_data_norm$Weight)
+#Shapiro - Wilk test
+sw_test_weight <- shapiro.test(torea_data_norm_we)
+print(sw_test_weight)
+
+#bill length
+#remove NA
+torea_data_norm_bl <- na.omit(torea_data_norm$Bill_Length)
+#Shapiro - Wilk test
+sw_test_bill_length <- shapiro.test(torea_data_norm_bl)
+print(sw_test_bill_length)
+
+#bill Depth
+#remove NA
+torea_data_norm_bd <- na.omit(torea_data_norm$Bill_Depth)
+#Shapiro - Wilk test
+sw_test_bill_Depth <- shapiro.test(torea_data_norm_bd)
+print(sw_test_bill_Depth)
+
+#bill Width
+#remove NA
+torea_data_norm_bw <- na.omit(torea_data_norm$Bill_Width)
+#Shapiro - Wilk test
+sw_test_bill_Width <- shapiro.test(torea_data_norm_bw)
+print(sw_test_bill_Width)
+
+#wing length
+#remove NA
+torea_data_norm_wl <- na.omit(torea_data_norm$Wing_Length)
+#Shapiro - Wilk test
+sw_test_wing_length <- shapiro.test(torea_data_norm_wl)
+print(sw_test_wing_length)
+
+#tarsus length
+#remove NA
+torea_data_norm_tl <- na.omit(torea_data_norm$Tarsus_Length)
+#Shapiro - Wilk test
+sw_test_tarsus_length <- shapiro.test(torea_data_norm_tl)
+print(sw_test_tarsus_length)
+
+#discriminant score
+#remove NA
+torea_data_norm_ds <- na.omit(torea_data_norm$discriminant_score)
+#Shapiro - Wilk test
+sw_test_discrim_score <- shapiro.test(torea_data_norm_ds)
+print(sw_test_discrim_score)
+
+#body condition
+#remove NA
+torea_data_norm_bc <- na.omit(torea_data_norm$Body_condition_TL)
+#Shapiro - Wilk test
+sw_test_body_cond <- shapiro.test(torea_data_norm_bc)
+print(sw_test_body_cond)
+```
+
+
+
+
+
+

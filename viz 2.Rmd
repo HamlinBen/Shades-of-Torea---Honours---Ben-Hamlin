@@ -1,0 +1,512 @@
+---
+title: "viz 2"
+author: "Ben Hamlin"
+date: "2024-08-22"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+
+```{r}
+#library import of packages used in this project
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(readxl)
+library(vcd)
+```
+
+```{r}
+# Reading morphometric Data into R, specific file path required due to computer specific storage.
+morph_traits <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "MorphometricAdultSIPO2020-23-Mal.xlsx"))
+#removing null time data from date of collection
+morph_traits$Date <- format(morph_traits$Date, "%Y-%m")
+
+#reading Sexing Data file into R, filepath as above. 
+sex_inf <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SexingData-Mal.xlsx"))
+#Produced one null line resulting in N/A results, removed from data frame.
+sex<- sex_inf[-143,]
+# removing null time data from date of collection.
+sex$Date <- format(sex$Date, "%Y-%m")
+#Checking data for any immediate issues
+str(morph_traits)
+str(sex)
+```
+
+---
+Check morphometric data
+---
+
+```{r}
+# Code to produce Tōrea morphometric data banding date visual check.
+ggplot(morph_traits, aes(x = Date)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data banding date visualisation", x = "Date", y = "Tōrea banded") + 
+#minimal theme to reduce clutter.
+  theme_minimal() +
+#Banding dates turned 45 degrees to avoid running into each other, centres title, also adds hard axis lines for clarity.
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+#Y axis expanded to stop first bin stat count from being cut off.  
+  scale_y_continuous(limits = c(0, 30))
+```
+
+```{r}
+# Code to produce Tōrea morphometric data location visual check.
+ggplot(morph_traits, aes(y = Northing, x = Easting)) + 
+  geom_point() + labs(title = "Tōrea morphometric data location visualisation", y = "Northing", x =   "Easting") +
+#Theme minimal used to reduce clutter
+  theme_minimal() +
+#Centres title, and adds hard axis lines to increase clarity ,
+  theme( plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"))
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bander visual check.
+#code to organise in descending order.
+bander_counts <- morph_traits %>%
+  count(Bander) %>%
+  arrange(desc(n))
+
+#turns the bander data into a factor so a bar graph can be generated
+morph_traits$Bander <- factor(morph_traits$Bander, levels = bander_counts$Bander)
+
+ggplot(morph_traits, aes(x = Bander, fill = Bander)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data bander visualisation", x = "Bander", y = "Tōrea banded") + 
+#theme minimal used to reduce clutter
+  theme_minimal() +
+#Removes uneccesary legend, centres title, adds axis edge lines and rotates bander names 45 degrees to avoid names running into eachother.
+  theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+#Adds counts above the bars for easy checking, vjust moves counts up above bars.
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+# increases Y axis to stop first bins count from being cut off.
+  scale_y_continuous(limits = c(0, 60))
+```
+
+```{r}
+# Code to produce Tōrea morphometric data band number visual check.
+ggplot(morph_traits, aes(x = Band_Number, fill = Band_Number)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data band number visualisation", x = "Band Number", y = "Tōrea banded") +
+#Themem minimal to increase clarity.
+  theme_minimal() +
+#removes uneccesary legend, centres title, adds hard axis line, and rotates band numbers 90 degrees to avoid numbers running into eachother.
+  theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6.5)) +
+# Adds counts above bars for easy checking, vjust moves numbers up above bars.  
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+# increases Y axis to avoid cutting T2191 count.
+  expand_limits(y=2.2)
+```
+
+at least one duplicate band number can be seen, but small x axis means a coding check is more logical
+
+```{r}
+#Code to find duplicate band number
+duplicate_band <- morph_traits[duplicated(morph_traits$Band_Number) | duplicated(morph_traits$Band_Number, fromLast = TRUE), ]
+print(duplicate_band)
+```
+
+The Band Number T2191 appears twice with different morphometric data attached to each one, this is likely a recording error with one supposed to be T2192 which is not in this dataset.
+
+```{r}
+# Code to produce Tōrea morphometric data flag colour visual check.
+ggplot(morph_traits, aes(x = Flag_Colour, fill = Flag_Colour)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data flag colour visualisation", x = "Flag Colour", y = "Tōrea banded") + 
+# Fills the bars manually as orange and grey for visual clarity.
+  scale_fill_manual(name = "Flag Colours", values = c(Orange = "orange", White = "grey")) +
+# Theme minimal used to increase clarity
+  theme_minimal() +
+# Removes unneccesary legend, centres title and adds hard axis lines.
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) +
+# Adds the bin counts above the bins for easier checking.
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+# Increases Y axis so bin counts are not cut off.
+  scale_y_continuous(limits = c(0, 95)) 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data flag code visualisation.
+ggplot(morph_traits, aes(x = Flag_Code, fill = Flag_Code)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data flag code visualisation", x = "Flag Code", y = "Tōrea banded") + 
+  theme_minimal() +
+  theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6.5)) +
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  expand_limits(y=1.2)
+```
+
+```{r}
+# Code to produce Tōrea morphometric data GPS Tag ID visualisation.
+ggplot(morph_traits, aes(x = GPS_Tag_ID, fill = GPS_Tag_ID)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data GPS Tag ID visualisation", x = "GPS Tag ID", y = "Tōrea Tagged") + 
+  theme_minimal() +
+  theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1)) +
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0,60))
+```
+
+```{r}
+# Code to produce Tōrea morphometric data nest visualisation.
+ggplot(morph_traits, aes(x = Nest, fill = Nest)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea morphometric data nest visualisation", x = "Nest Code", y = "Tōrea banded") + 
+  theme_minimal() +
+  theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1, size = 7)) +
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  expand_limits(y=2.2)
+```
+
+```{r}
+#code to comb nest duplicates.
+duplicate_nest <- morph_traits[duplicated(morph_traits$Nest) | duplicated(morph_traits$Nest, fromLast = TRUE), ]
+print(duplicate_nest)
+#Easting & Northing should match for duplicates if same nest 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data weight visualisation.
+weight_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Weight, 0.25), Q3 = quantile(Weight, 0.75)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR) %>%
+  collect()
+
+# Code produces visualisation of outliers 
+morph_traits_weight <- morph_traits %>%
+  mutate(Outlier = ifelse(Weight < weight_summary$Lower | Weight > weight_summary$Upper, "Outlier", "Not Outlier"))
+
+
+ggplot(morph_traits_weight, aes(x = "", y = Weight)) + 
+  geom_boxplot(aes(fill = "Weight"), outlier.shape = NA) + 
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea weight visualisation", x = "", y = "Tōrea Weight (kg)") +
+  scale_fill_manual(values = c("Weight" = "lightblue")) + 
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bill length visualisation.
+Bill_Length_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Bill_Length, 0.25, na.rm = TRUE), 
+            Q3 = quantile(Bill_Length, 0.75, na.rm = TRUE)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR)
+
+# Code produces visualisation of outliers 
+morph_traits_bill_length <- morph_traits %>%
+  mutate(Outlier = ifelse(Bill_Length < Bill_Length_summary$Lower | Bill_Length > Bill_Length_summary$Upper, "Outlier", "Not Outlier"),
+         Outlier = ifelse(is.na(Bill_Length), NA, Outlier))  
+
+ggplot(morph_traits_bill_length, aes(x = "", y = Bill_Length)) + 
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) +
+  labs(title = "Tōrea bill length visualisation", x = "", y = "Tōrea Bill Length (mm)") +
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bill depth visualisation.
+Bill_Depth_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Bill_Depth, 0.25, na.rm = TRUE), 
+            Q3 = quantile(Bill_Depth, 0.75, na.rm = TRUE)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR)
+
+# Code produces visualisation of outliers 
+morph_traits_bill_depth <- morph_traits %>%
+  mutate(Outlier = ifelse(Bill_Depth < Bill_Depth_summary$Lower | Bill_Depth > Bill_Depth_summary$Upper, "Outlier", "Not Outlier"),
+         Outlier = ifelse(is.na(Bill_Depth), NA, Outlier))  
+
+ggplot(morph_traits_bill_depth, aes(x = "", y = Bill_Depth)) + 
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) +
+  labs(title = "Tōrea bill depth visualisation", x = "", y = "Tōrea Bill Depth (mm)") +
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.text.x = element_blank(),  axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bill width visualisation.
+Bill_Width_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Bill_Width, 0.25, na.rm = TRUE), 
+            Q3 = quantile(Bill_Width, 0.75, na.rm = TRUE)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR)
+
+# Code produces visualisation of outliers 
+morph_traits_bill_width <- morph_traits %>%
+  mutate(Outlier = ifelse(Bill_Width < Bill_Width_summary$Lower | Bill_Width > Bill_Width_summary$Upper, "Outlier", "Not Outlier"),
+         Outlier = ifelse(is.na(Bill_Width), NA, Outlier))  
+
+ggplot(morph_traits_bill_width, aes(x = "", y = Bill_Width)) + 
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) +
+  labs(title = "Tōrea bill width visualisation", x = "", y = "Tōrea Bill Width (mm)") +
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.text.x = element_blank(), axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data wing length visualisation.
+Wing_Length_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Wing_Length, 0.25, na.rm = TRUE), 
+            Q3 = quantile(Wing_Length, 0.75, na.rm = TRUE)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR)
+
+# Code produces visualisation of outliers 
+morph_traits_wing_length <- morph_traits %>%
+  mutate(Outlier = ifelse(Wing_Length < Wing_Length_summary$Lower | Wing_Length > Wing_Length_summary$Upper, "Outlier", "Not Outlier"),
+         Outlier = ifelse(is.na(Wing_Length), NA, Outlier))  
+
+ggplot(morph_traits_wing_length, aes(x = "", y = Wing_Length)) + 
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) +
+  labs(title = "Tōrea wing length visulaisation", x = "", y = "Tōrea Wing Length (mm)") +
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.text.x = element_blank(),  axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data tarsus length visualisation.
+Tarsus_Length_summary <- morph_traits %>%
+  summarize(Q1 = quantile(Tarsus_Length, 0.25, na.rm = TRUE), 
+            Q3 = quantile(Tarsus_Length, 0.75, na.rm = TRUE)) %>%
+  mutate(IQR = Q3 - Q1, Lower = Q1 - 1.5 * IQR, Upper = Q3 + 1.5 * IQR)
+
+# Code produces visualisation of outliers 
+morph_traits_tarsus_length <- morph_traits %>%
+  mutate(Outlier = ifelse(Tarsus_Length < Tarsus_Length_summary$Lower | Tarsus_Length > Tarsus_Length_summary$Upper, "Outlier", "Not Outlier"),
+         Outlier = ifelse(is.na(Tarsus_Length), NA, Outlier))  
+
+ggplot(morph_traits_tarsus_length, aes(x = "", y = Tarsus_Length)) + 
+  geom_boxplot(fill = "lightblue", outlier.shape = NA) +
+  geom_jitter(aes(color = Outlier), width = 0.2, alpha = 0.5) +
+  labs(title = "Tōrea tarsus length visualisation", x = "", y = "Tōrea Tarsus Length (mm)") +
+  scale_color_manual(values = c("Outlier" = "red", "Not Outlier" = "gray50")) +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.text.x = element_blank(),  axis.ticks.x = element_blank())
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bill shape visualisation.
+# Arranged in descending order to make checking easier
+bshape_counts <- morph_traits %>%
+  count(Bill_Shape) %>%
+  arrange(desc(n))
+
+morph_traits$Bill_Shape <- factor(morph_traits$Bill_Shape, levels = bshape_counts$Bill_Shape)
+
+ggplot(morph_traits, aes(x = Bill_Shape, fill = Bill_Shape)) + 
+  geom_bar(stat = "count") + labs(title = "Tōrea bill shape visualisation", x = "Bill Shape", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0, 90)) 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data bill colour visualisation.
+ggplot(morph_traits, aes(x = Bill_Colour, fill = Bill_Colour)) + geom_bar(stat = "count") +
+  labs(title = "Tōrea bill colour visualisation", x = "Bill Colour", y = "Tōrea banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") + 
+  scale_fill_manual(name=" colour", values = c("Bright orange"="yellow3", "Orange"="orange" )) +
+  scale_y_continuous(limits = c(0, 83)) 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data leg colour visualisation.
+ggplot(morph_traits, aes(x = Leg_Colour, fill = Leg_Colour)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea leg colour visualisation", x = "Leg Colour", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") + 
+  scale_fill_manual(name=" colour", values = c("Coral"="coral", "Coral - purple"="purple", "Pink"="pink" )) +
+  scale_y_continuous(limits = c(0, 50)) 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data iris colour visualisation.
+# Arranged in descending order to increase clarity
+Icolour_counts <- morph_traits %>%
+  count(Iris_Colour) %>%
+  arrange(desc(n))
+
+morph_traits$Iris_Colour<- factor(morph_traits$Iris_Colour, levels = Icolour_counts$Iris_Colour)
+
+ggplot(morph_traits, aes(x = Iris_Colour, fill = Iris_Colour)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea Iris colour visualisation", x = "Iris Colour", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") + 
+  scale_fill_manual(name=" colour", values = c("Bright red scarlet"="coral", "Brown"="brown", "Dull red"="maroon", "Orange-red"="orange", "Red"="red","Red-orange"="orange4", "Scarlet"="pink")) +
+  scale_y_continuous(limits = c(0, 35)) 
+```
+
+```{r}
+# Code to produce Tōrea morphometric data Iris fleck visualisation.
+# Arranged in descending order to increase clarity.
+Ifleck_counts <- morph_traits %>%
+  count(Iris_Fleck) %>%
+  arrange(desc(n))
+
+morph_traits$Iris_Fleck <- factor(morph_traits$Iris_Fleck, levels = Ifleck_counts$Iris_Fleck)
+
+ggplot(morph_traits, aes(x = Iris_Fleck, fill = Iris_Fleck)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea iris fleck visualisation", x = "Iris Fleck", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0, 70))  
+```
+
+---
+Check Sex Data
+---
+
+```{r}
+# Code to produce Tōrea Sex data sample ID visualisation.
+# Arranged in descending order to increase clarity.
+Sample_ID_counts <- sex %>%
+  count(Sample_ID) %>%
+  arrange(desc(n))
+
+sex$Sample_ID <- factor(sex$Sample_ID, levels = Sample_ID_counts$Sample_ID)
+
+ggplot(sex, aes(x = Sample_ID, fill = Sample_ID)) + 
+  geom_bar() +
+  labs(title = "Tōrea sex data sample ID visualisation", x = "Sample ID", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black", size = 3)+
+  expand_limits(x = 137, y= 11)
+```
+
+```{r}
+#Code to confirm duplicate Sample ID as NA
+duplicate_ID <- sex[duplicated(sex$Sample_ID) | duplicated(sex$Sample_ID, fromLast = TRUE), ]
+print(duplicate_ID)
+#Confirming Sample ID is N/A due to small x axis label.
+```
+
+```{r}
+# Code to produce Tōrea Sex data band number visualisation.
+ggplot(sex, aes(x = Band_Number, fill = Band_Number)) + 
+  geom_bar() +
+  labs(title = "Tōrea sex data band number visualisation", x = "Band Number", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1, size = 5)) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black", size = 3) +
+  expand_limits(y=2.2)
+```
+
+```{r}
+#Code to identify duplicate band number as N/A
+duplicate_band_sex <- sex[duplicated(sex$Band_Number) | duplicated(sex$Band_Number, fromLast = TRUE), ]
+print(duplicate_band_sex)
+#confirming NA as Band number
+```
+
+```{r}
+# Code to produce Tōrea Sex data DNA sex visualisation.
+ggplot(sex, aes(x = DNA_sex, fill = DNA_sex)) + 
+  geom_bar(stat = "count") +
+  labs(title = "Tōrea DNA sex visualisation", x = "DNA Sex", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0, 70))  
+```
+
+```{r}
+# Code to produce Tōrea Sex data flag code visualisation.
+ggplot(sex, aes(x = Flag_Code, fill = Flag_Code)) + 
+  geom_bar() +
+  labs(title = "Tōrea sex data flag code visualisation", x = "Flag Code", y = "Tōrea Banded") +
+  theme_minimal() +
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1, size = 3)) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black", size = 3)
+```
+
+```{r}
+#Code to confirm duplicate flag code as NA.
+duplicate_flag_code <- sex[duplicated(sex$Flag_Code) | duplicated(sex$Flag_Code, fromLast = TRUE), ]
+print(duplicate_flag_code)
+#confirms duplicate flag codes are NA.
+```
+
+```{r}
+# Code to produce Tōrea Sex data flag colour visualisation.
+ggplot(sex, aes(x = Flag_Colour, fill = Flag_Colour)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea sex data flag colour visualisation", x = "Flag Colour", y = "Tōrea Banded") +
+  scale_fill_manual(name = "Flag Colours", values = c("Orange" = "orange", "NA" = "black")) +
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0, 140)) 
+```
+
+```{r}
+# Code to produce Tōrea Sex data sample ID visualisation.
+ggplot(sex, aes(x = GPS_Tag_ID, fill = GPS_Tag_ID)) + 
+ geom_bar(stat = "count") + 
+ labs(title = "Tōrea sex data GPS Tag ID visualisation", x = "GPS Tag ID", y = "Tōrea Tagged") +
+ theme_minimal() +
+ theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 90, hjust = 1)) +
+ geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  expand_limits(y = 110, x=38)
+```
+
+```{r}
+# Code to produce Tōrea Sex data date visualisation.
+ggplot(sex, aes(x = Date)) + 
+  geom_bar(stat = "count") + 
+  labs(title = "Tōrea sex data date visualisation", x = "Date", y = "Tōrea banded") + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black")) + 
+  geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  scale_y_continuous(limits = c(0, 35)) 
+```
+
+```{r}
+# Code to produce Tōrea Sex data location visualisation.
+ggplot(sex, aes(x = Location, fill = Location)) + 
+ geom_bar(stat = "count") + 
+ labs(title = "Tōrea sex data location visualisation", x = "Location", y = "Tōrea Tagged") +
+ theme_minimal() +
+ theme(legend.position = "none",  plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"), axis.text.x = element_text(angle = 45, hjust = 1)) +
+ geom_text(stat = 'count', aes(label = after_stat(count)), vjust = -0.5, colour = "black") +
+  expand_limits(y=145)
+```
+
+```{r}
+# Code to produce Tōrea Sex data location shape. 
+#Graph is jittered as all but the outliers in top left and bottom right are clustered into one site.
+ggplot(sex, aes(y = Northing, x = Easting)) + 
+  geom_point() + 
+  labs(title = "Tōrea sex data location shape", y = "Northing", x = "Easting") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5), axis.line = element_line(colour = "black"))
+```
+
+```{r}
+common_id_merge <- merge(morph_traits, sex, by="Band_Number")
+print(common_id_merge)
+```

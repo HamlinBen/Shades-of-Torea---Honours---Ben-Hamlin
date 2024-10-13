@@ -1,0 +1,86 @@
+---
+title: "youth boys"
+author: "Ben Hamlin"
+date: "2024-10-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+```
+
+```{r}
+# Reading morphometric Data into R, specific file path required due to computer specific storage.
+morph_traits <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "MorphometricAdultSIPO2020-23-Mal.xlsx"))
+#removing null time data from date of collection
+morph_traits$Date <- format(morph_traits$Date, "%Y-%m")
+
+#reading Sexing Data file into R, filepath as above. 
+sex_inf <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SexingData-Mal.xlsx"))
+#Produced one null line resulting in N/A results, removed from data frame.
+sex<- sex_inf[-143,]
+# removing null time data from date of collection.
+sex$Date <- format(sex$Date, "%Y-%m")
+#Checking data for any immediate issues
+str(morph_traits)
+str(sex)
+
+
+#age data
+age <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SIPO_AgeDetails.xlsx"))
+str(age)
+print(morph_traits)
+print(sex)
+```
+
+```{r}
+#morph traits
+if ("Band_Number" %in% colnames(morph_traits) & "Band_Number" %in% colnames(age)) {
+  aged_torea_morph <- full_join(morph_traits, age, by = "Band_Number")
+}
+
+print(aged_torea_morph)
+str(aged_torea_morph)
+
+#remove fledglings
+aged_torea_filter <- aged_torea_morph %>%
+  filter(Age != 'Fledgling',
+         !is.na(Date))
+         
+
+print(aged_torea_filter)
+str(aged_torea_filter)
+
+```
+
+```{r}
+#Sex
+if ("Band_Number" %in% colnames(sex) & "Band_Number" %in% colnames(age)) {
+  aged_torea_morph <- full_join(sex, age, by = "Band_Number")
+}
+
+print(aged_torea_morph)
+str(aged_torea_morph)
+
+#remove fledglings
+aged_torea_filter <- aged_torea_morph %>%
+  filter(Age != 'Fledgling',
+         !is.na(Date))
+         
+
+print(aged_torea_filter)
+str(aged_torea_filter)
+table(aged_torea_filter$DNA_sex)
+```
+
+

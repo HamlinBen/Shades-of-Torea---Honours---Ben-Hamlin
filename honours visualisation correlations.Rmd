@@ -1,0 +1,514 @@
+---
+title: "honours Sex and BC visualisation"
+author: "Ben Hamlin"
+date: "2024-08-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+```
+
+
+---
+Data import 
+---
+```{r}
+#import datasets in this project
+# Reading Morphological Data into R, specific file path required due to computer specific storage.
+morph_traits <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "MorphometricAdultSIPO2020-23-Mal.xlsx"))
+#removing null time data from date of collection
+morph_traits$Date <- as.Date(morph_traits$Date)
+morph_traits$Date <- format(morph_traits$Date, "%Y-%m")
+#reading DNA sex into R.
+sex_inf <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SexingData-Mal.xlsx"))
+#Produced one null line resulting in N/A results, removed from data frame.
+sex<- sex_inf[-143,]
+#removing null time data from date of collection
+sex$Date <- as.Date(sex$Date)
+sex$Date <- format(sex$Date, "%Y-%m")
+#Checking data for any immediate issues
+str(morph_traits)
+str(sex)
+```
+
+```{r}
+#Join both datasets by common columns using full join.
+# This will be our full dataset on which statistical analysis will be done
+# sex has 142 rows, morph_traits has 95, baseline_data shows 58 (52 from basline_data + 4 X or No samples) are common across both, expect (142+95-58) 179 rows in this dataset.
+#"xy" duplication occurs.
+torea_data_cor <- full_join(sex,morph_traits,by = "Band_Number")
+#combine flag colours
+torea_data_cor <- torea_data_cor %>%
+  mutate(Flag_Colour = ifelse(is.na(Flag_Colour.x),Flag_Colour.y,Flag_Colour.x))
+#combine GPS tag ID
+torea_data_cor <- torea_data_cor %>%
+  mutate(GPS_Tag_ID = ifelse(is.na(GPS_Tag_ID.x),GPS_Tag_ID.y,GPS_Tag_ID.x))
+#Combine Flag Code
+torea_data_cor <- torea_data_cor %>%
+  mutate(Flag_Code = ifelse(is.na(Flag_Code.x),Flag_Code.y,Flag_Code.x))
+#combine Easting (morphometric data (y) as primary)
+torea_data_cor <- torea_data_cor %>%
+  mutate(Easting = ifelse(is.na(Easting.y),Easting.x,Easting.y))
+#combine northing (morphometric (y) as primary)
+torea_data_cor <- torea_data_cor %>%
+  mutate(Northing = ifelse(is.na(Northing.y),Northing.x,Northing.y))
+#combine dates- as.date to stop scintific notation format
+torea_data_cor <- torea_data_cor %>%
+  mutate(Date = ifelse(is.na(Date.x),Date.y,Date.x))
+#remove x-y repeats
+torea_data_cor <- torea_data_cor %>%
+  select(-Date.x, -Date.y, -Northing.x, -Northing.y, -Easting.x, -Easting.y, -Flag_Code.x, -Flag_Code.y, -Flag_Colour.x, -Flag_Colour.y, -GPS_Tag_ID.x, -GPS_Tag_ID.y)
+
+str(torea_data_cor)
+```
+
+```{r}
+# discrimnant function key points
+# coefficients.
+a1 <- 0.46
+a2 <- 3.15
+a3 <- 2.94
+
+# discriminant point
+discriminant_point <- 77.41
+```
+
+```{r}
+#Bakers equation, full dataset
+#First run through only using Bakers equation sex results, then we will modify data using DNA sex results as the reliable result
+
+# Apply the discriminant function and create a new column
+torea_data_cor <- torea_data_cor %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M")
+  )
+
+# Print the modified dataset
+print(torea_data_cor[,c("Band_Number", "DNA_sex", "Bakers_sex")])
+#print datapoints that are NA to confirm rational for NA result
+print(torea_data_cor[is.na(torea_data_cor$Bakers_sex), c("Band_Number", "Bakers_sex", "DNA_sex", "Bill_Length", "Bill_Depth", "Bill_Width")])
+
+torea_data_cor <- torea_data_cor %>%
+      mutate(Full_Sex = if_else(is.na(DNA_sex) | DNA_sex %in% c("NO SAMPLE", "X"), Bakers_sex, DNA_sex)
+)
+print(torea_data_cor)
+#No calculation of Bakers equation accuracy as sex is not known only modeled. 
+# add body weight calculations 
+torea_data_cor <- torea_data_cor %>%
+  mutate(Body_condition_TL = torea_data_cor$Weight/torea_data_cor$Tarsus_Length, 
+         Body_condition_WL = torea_data_cor$Weight/torea_data_cor$Wing_Length, 
+         Body_condition_BL = torea_data_cor$Weight/torea_data_cor$Bill_Length
+         )
+print(torea_data_cor)
+```
+
+---
+correlation of traits to sex
+---
+```{r}
+#correlation of continous traits to Sex
+t_test_weight_sex<-t.test(Weight ~ Full_Sex, data = torea_data_cor)
+t_test_Bill_length <- t.test(Bill_Length ~ Full_Sex, data=torea_data_cor)
+t_test_Bill_Width <- t.test(Bill_Width ~ Full_Sex, data = torea_data_cor)
+t_test_Bill_Depth <- t.test(Bill_Depth ~ Full_Sex, data = torea_data_cor)
+t_test_Wing_Length <- t.test(Wing_Length ~Full_Sex, data=torea_data_cor)
+t_test_Tarsus_Length <- t.test(Tarsus_Length ~ Full_Sex, data = torea_data_cor)
+
+#print results
+print(t_test_weight_sex)
+print(t_test_Bill_length)
+print(t_test_Bill_Width)
+print(t_test_Bill_Depth)
+print(t_test_Wing_Length)
+print(t_test_Tarsus_Length)
+```
+
+```{r}
+# visualizing continuous variables relationship to sex
+#remove NA sex to reduce facets
+torea_data_cor_vis <- torea_data_cor %>%
+  filter(!is.na(Full_Sex))
+
+#sex vs weight
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Weight)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas sex vs weight",
+       x = "Sex",
+       y = "Weight (g)") +
+  theme_minimal()
+
+#sex vs Bill Length
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Bill_Length)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas sex vs bill length",
+       x = "Sex",
+       y = "Bill length (mm)") +
+  theme_minimal()
+
+#sex vs Bill width
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Bill_Width)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas sex vs bill width",
+       x = "Sex",
+       y = "Bill width (mm)") +
+  theme_minimal()
+
+#sex vs Bill Depth
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Bill_Depth)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas sex vs bill depth",
+       x = "Sex",
+       y = "Bill depth (mm)") +
+  theme_minimal()
+
+#sex vs Wing Length
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Wing_Length)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plotof Toreas sex vs wing length",
+       x = "Sex",
+       y = "Wing length (mm)") +
+  theme_minimal()
+
+#sex vs Tarsus Length
+ggplot(torea_data_cor_vis, aes(x = Full_Sex, y = Tarsus_Length)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas sex vs tarsus + midtoe length",
+       x = "Sex",
+       y = "Tarsus + midtoe length (mm)") +
+  theme_minimal()
+```
+
+
+```{r}
+#check bin counts for variables to chose analysis method.
+table_bill_shape <- table(torea_data_cor$Bill_Shape, torea_data_cor$Full_Sex)
+table_bill_colour <- table(torea_data_cor$Bill_Colour, torea_data_cor$Full_Sex)
+table_leg_colour <- table(torea_data_cor$Leg_Colour, torea_data_cor$Full_Sex)
+table_iris_colour <- table(torea_data_cor$Iris_Colour,torea_data_cor$Full_Sex)
+table_iris_fleck <- table(torea_data_cor$Iris_Fleck, torea_data_cor$Full_Sex)
+
+
+
+print(table_bill_shape)
+print(table_bill_colour)
+print(table_leg_colour)
+print(table_iris_colour)
+print(table_iris_fleck)
+```
+
+```{r}
+#coalesce and drop values of cor data
+# dropping blunt morphology
+torea_data_cor <- torea_data_cor %>%
+  mutate(Bill_Shape = ifelse(Bill_Shape == "Blunt",NA, Bill_Shape))
+unique(torea_data_cor$Bill_Shape)
+
+#Coalescing Iris colour
+torea_data_cor <- torea_data_cor %>%
+  mutate(Iris_Colour = case_when(Iris_Colour %in% c("Brown","Brown-Orange","Orange-brown", "Dull orange","Orange","Orange-red") ~ "Brown-orange", Iris_Colour %in% c("Dull red","Red") ~ "Red",
+         TRUE ~ Iris_Colour))
+unique(torea_data_cor$Iris_Colour)
+#coalescing Iris fleck
+torea_data_cor <- torea_data_cor %>% 
+  mutate(Iris_Fleck = case_when(Iris_Fleck %in% c("Fleck","L large R slight") ~ "Fleck", TRUE ~Iris_Fleck))
+unique(torea_data_cor$Iris_Fleck)
+```
+
+```{r}
+#correlation testing of the categorical variables to sex
+#bill shape v sex
+cont_table_1 <- table(torea_data_cor$Full_Sex, torea_data_cor$Bill_Shape)
+chi_sex_bill<-chisq.test(cont_table_1)
+print(chi_sex_bill)
+
+#bill colour v sex
+cont_table_2 <- table(torea_data_cor$Full_Sex, torea_data_cor$Bill_Colour)
+chi_sex_bill_colour<-chisq.test((cont_table_2))
+print(chi_sex_bill_colour)
+
+#leg colour v sex
+cont_table_3<-table(torea_data_cor$Full_Sex, torea_data_cor$Leg_Colour)
+chi_sex_leg<-chisq.test(cont_table_3)
+print(chi_sex_leg)
+
+#iris colour v sex
+cont_table_4<-table(torea_data_cor$Full_Sex, torea_data_cor$Iris_Colour)
+fish_sex_iris_col<-fisher.test(cont_table_4)
+print(fish_sex_iris_col)
+
+#iris fleck v sex
+cont_table_5<-table(torea_data_cor$Full_Sex, torea_data_cor$Iris_Fleck)
+fish_sex_iris_fleck<-fisher.test(cont_table_5)
+print(fish_sex_iris_fleck)
+```
+
+````{r}
+#visual representation of sex to categorical variables
+#remove NA sex to reduce facets
+torea_data_cor_vis <- torea_data_cor %>%
+  filter(!is.na(Full_Sex))
+
+#dodged bar plot
+#bill shape v sex
+#remove NA bill shape 
+torea_data_cor_vis1 <- torea_data_cor_vis %>%
+  filter(!is.na(Bill_Shape))
+
+ggplot(torea_data_cor_vis1, aes(x = Bill_Shape, fill = Full_Sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar plot of Torea sex v bill shape",
+       x = "Torea bill shape",
+       y = "Torea count") +
+  theme_minimal()
+
+#bill colour v sex
+#remove NA bill colour 
+torea_data_cor_vis2 <- torea_data_cor_vis %>%
+  filter(!is.na(Bill_Colour))
+
+ggplot(torea_data_cor_vis2, aes(x = Bill_Colour, fill = Full_Sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar plot of Torea sex v bill colour",
+       x = "Torea bill colour",
+       y = "Torea count") +
+  theme_minimal()
+
+#leg colour v sex
+#remove NA leg colour 
+torea_data_cor_vis3 <- torea_data_cor_vis %>%
+  filter(!is.na(Leg_Colour))
+
+ggplot(torea_data_cor_vis3, aes(x =Leg_Colour, fill = Full_Sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar plot of Torea sex v leg colour",
+       x = "Torea leg colour",
+       y = "Torea count") +
+  theme_minimal()
+
+#Iris colour v sex
+#remove NA iris colour
+torea_data_cor_vis4 <- torea_data_cor_vis %>%
+  filter(!is.na(Iris_Colour))
+
+ggplot(torea_data_cor_vis4, aes(x =Iris_Colour, fill = Full_Sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar plot of Torea sex v iris colour",
+       x = "Torea iris colour",
+       y = "Torea count") +
+  theme_minimal()
+
+#Iris fleck v sex
+#remove NA iris fleck 
+torea_data_cor_vis5 <- torea_data_cor_vis %>%
+  filter(!is.na(Iris_Fleck))
+
+ggplot(torea_data_cor_vis5, aes(x = Iris_Fleck, fill = Full_Sex)) +
+  geom_bar(position = "dodge") +
+  labs(title = "Bar plot of Torea sex v iris fleck",
+       x = "Torea iris fleck",
+       y = "Torea count") +
+  theme_minimal()
+```
+
+```{r}
+# correlation of continuous morphometrics to BC
+# using TL as most precise 
+
+#TLBC v weight
+model_BC_W <- lm(Body_condition_TL ~ Weight , data = torea_data_cor)
+stats_BC_W <- summary(model_BC_W)
+print(stats_BC_W)
+
+#TLBC v bill length
+model_BC_blen <- lm(Body_condition_TL ~ Bill_Length , data = torea_data_cor)
+stats_BC_blen <- summary(model_BC_blen)
+print(stats_BC_blen)
+
+#TLBC v bill width
+model_BC_bwid <- lm(Body_condition_TL ~ Bill_Width , data = torea_data_cor)
+stats_BC_bwid <- summary(model_BC_bwid)
+print(stats_BC_bwid)
+
+#TLBC v bill depth
+model_BC_bdep <- lm(Body_condition_TL ~ Bill_Depth , data = torea_data_cor)
+stats_BC_bdep <- summary(model_BC_bdep)
+print(stats_BC_bdep)
+
+#TLBC v wing length
+model_BC_wlen <- lm(Body_condition_TL ~ Wing_Length , data = torea_data_cor)
+stats_BC_wlen <- summary(model_BC_wlen)
+print(stats_BC_wlen)
+
+#TLBC v bill length
+model_BC_blen <- lm(Body_condition_TL ~ Bill_Length , data = torea_data_cor)
+stats_BC_blen <- summary(model_BC_blen)
+print(stats_BC_blen)
+
+#TLBC v tarsus length
+model_BC_tlen <- lm(Body_condition_TL ~ Tarsus_Length , data = torea_data_cor)
+stats_BC_tlen <- summary(model_BC_tlen)
+print(stats_BC_tlen)
+```
+
+```{r}
+# visualizing continuous variable relationships
+#TLBC vWeight
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Weight)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v Weight",
+       x = "Body condition",
+       y = "Weight (g)") +
+  theme_minimal()
+
+#TLBC v bill length
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Bill_Length)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v bill length",
+       x = "Body condition",
+       y = "Bill length (mm)") +
+  theme_minimal()
+
+#TLBC v bill width
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Bill_Width)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v bill width",
+       x = "Body condition",
+       y = "Bill width (mm)") +
+  theme_minimal()
+
+#TLBC v Bill depth
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Bill_Depth)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v bill depth",
+       x = "Body condition",
+       y = "Bill depth (mm)") +
+  theme_minimal()
+
+#TLBC v wing length
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Wing_Length)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v wing length",
+       x = "Body condition",
+       y = "Wing length (mm)") +
+  theme_minimal()
+
+#TLBC v tarsus length
+ggplot(torea_data_cor, aes(x = Body_condition_TL, y = Tarsus_Length)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", color = "blue", se=TRUE) +
+  labs(title = "Scatter Plot of Torea body condition v tarsus length",
+       x = "Body condition",
+       y = "Tarsus length (mm)") +
+  theme_minimal()
+```
+
+```{r}
+#correlation of discrete traits to BC
+#ANOVA used as multiple different categories
+#bill shape v BC
+anova_BC_Bshape <- aov(Body_condition_TL ~ Bill_Shape, data = torea_data_cor)
+summary(anova_BC_Bshape)
+
+#bill colour v BC
+anova_BC_Bcol <- aov(Body_condition_TL ~ Bill_Colour, data = torea_data_cor)
+summary(anova_BC_Bcol)
+
+#leg colour v BC
+anova_BC_Lcol <- aov(Body_condition_TL ~ Leg_Colour, data = torea_data_cor)
+summary(anova_BC_Lcol)
+
+#iris colour v BC
+anova_BC_Icol <- aov(Body_condition_TL ~ Iris_Colour, data = torea_data_cor)
+summary(anova_BC_Icol)
+
+#Iris fleck v BC
+anova_BC_Ifleck <- aov(Body_condition_TL ~ Iris_Fleck, data = torea_data_cor)
+summary(anova_BC_Ifleck)
+```
+
+```{r}
+#visualising BC vs categorical traits
+#Bill shape
+torea_data_cor_vis2 <- torea_data_cor %>%
+  filter(!is.na(Bill_Shape))
+
+ggplot(torea_data_cor_vis2, aes(x = Bill_Shape, y = Body_condition_TL)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas Body condition v bill shape",
+       x = "Bill Shape",
+       y = "Body condition") +
+  theme_minimal()
+
+#Bill colour
+torea_data_cor_vis3 <- torea_data_cor %>%
+  filter(!is.na(Bill_Colour))
+
+ggplot(torea_data_cor_vis3, aes(x = Bill_Colour, y = Body_condition_TL)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas Body condition v bill colour",
+       x = "Bill colour",
+       y = "Body condition") +
+  theme_minimal()
+
+#Leg colour
+torea_data_cor_vis3 <- torea_data_cor %>%
+  filter(!is.na(Leg_Colour))
+
+ggplot(torea_data_cor_vis3, aes(x = Leg_Colour, y = Body_condition_TL)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas Body condition v leg colour",
+       x = "leg colour",
+       y = "Body condition") +
+  theme_minimal()
+
+#Iris colour
+torea_data_cor_vis4 <- torea_data_cor %>%
+  filter(!is.na(Iris_Colour))
+
+ggplot(torea_data_cor_vis4, aes(x = Iris_Colour, y = Body_condition_TL)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas Body condition v iris colour",
+       x = "iris colour",
+       y = "Body condition") +
+  theme_minimal()
+
+#Iris fleck
+torea_data_cor_vis5 <- torea_data_cor %>%
+  filter(!is.na(Iris_Fleck))
+
+ggplot(torea_data_cor_vis5, aes(x = Iris_Fleck, y = Body_condition_TL)) +
+  geom_boxplot(outlier.colour = "red") +
+  geom_jitter(width = 0.2, alpha = 0.5, color = "blue") +  
+  labs(title = "Box Plot of Toreas Body condition v iris fleck",
+       x = "Iris fleck",
+       y = "Body condition") +
+  theme_minimal()
+```
+

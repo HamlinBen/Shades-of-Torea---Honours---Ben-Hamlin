@@ -1,0 +1,57 @@
+---
+title: "Consolidating and creating data"
+author: "Ben Hamlin"
+date: "2024-04-02"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+---
+
+#combining the sheets
+```{r}
+library(dplyr)
+
+Torea_data <- full_join(sex,morph_traits,by = c("Band_Number","Easting","Northing","Date","Flag_Code","GPS_Tag_ID","Flag_Colour"))
+str(Torea_data)
+```
+"create condition index"
+```{r}
+Torea_data$condition <- Torea_data$Weight / Torea_data$Tarsus_Length
+Torea_data$condition[is.infinite(Torea_data$condition) | is.nan(Torea_data$condition)] <- NA
+print(Torea_data)
+```
+"create simpe test for condtion"
+
+```{r}
+Torea_data_con <- Torea_data
+Torea_data_con$condition_wing <-(Torea_data$Weight / Torea_data$Wing_Length)^2
+Torea_data_con$condition_wing[is.infinite(Torea_data_con$condition_wing) | is.nan(Torea_data_con$condition_wing)] <- NA
+
+Torea_data_con$condition_beak <-Torea_data$Weight / Torea_data$Bill_Length
+Torea_data_con$condition_beak[is.infinite(Torea_data_con$condition_beak) | is.nan(Torea_data_con$condition_beak)] <- NA
+print(Torea_data_con)
+```
+
+```{r}
+Torea_data_con2 <- pivot_longer(Torea_data_con, cols = c(condition, condition_wing, condition_beak), names_to = "condition_index", values_to = "condition")
+str(Torea_data_con2)
+
+library(ggplot2)
+
+ggplot(Torea_data_con2, aes(x = condition, color = condition_index)) +
+  geom_density(alpha = 0.5) +
+  labs(
+    title = "Comparison of condition indexes",
+    x = "Condition",
+    y = "Density"
+  ) +
+  scale_color_manual(name = "Condition Indexes", values = c("condition" = "blue", "condition_wing" = "red", "condition_beak" = "green"), labels = c("Condition by tarsus", "Condition by bill length", "Condition by wing length")) 
+
+
+```
+```{r}

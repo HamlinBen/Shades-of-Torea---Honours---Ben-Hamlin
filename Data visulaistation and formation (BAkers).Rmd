@@ -1,0 +1,741 @@
+---
+title: "Data visualisation and formation"
+author: "Ben Hamlin"
+date: "2024-05-26"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+Import data and library set up
+---
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(readxl)
+library(vcd)
+```
+
+```{r}
+#import datasets in this project
+# Reading Morphological Data into R.
+morph_traits <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "MorphometricAdultSIPO2020-23-Mal.xlsx"))
+
+
+#reading Sexing Data file into R. 
+sex_inf <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SexingData-Mal.xlsx"))
+#Produced one null line resulting in N/A results, removed from data frame.
+sex<- sex_inf[-143,]
+str(morph_traits)
+str(sex)
+```
+
+```{r}
+# binding datasets for known sex AND morphological traits
+# This will be our known base set for accurate results as only including birds which the sex is known and has linked morphological traits
+
+if("Band_Number" %in% colnames(morph_traits) & "Band_Number" %in% colnames(sex)) {
+  baseline_data <- merge(morph_traits, sex, by = "Band_Number")
+
+#Filter so only known sex samples are present
+baseline_data <- baseline_data %>%
+  filter(DNA_sex !="X" & DNA_sex !="NO SAMPLE")
+}
+
+print(baseline_data)
+str(baseline_data)
+```
+
+```{r}
+# merge full datasets
+# This will be our full dataset on which statistical analysis will be done
+# sex has 142 rows, morph_traits has 95, baseline_data shows 58 (52 from basline_data + 4 X or No samples) are common across both, expect (142+95-58) 179 rows in this dataset.
+# this dataset produces 180 rows, expect this to be due to T2191 appearing twice in morphometric data. 
+
+if ("Band_Number" %in% colnames(morph_traits) & "Band_Number" %in% colnames(sex)) {
+  full_data <- full_join(morph_traits, sex, by = "Band_Number")
+}
+
+print(full_data)
+str(full_data)
+  
+```
+
+
+---
+Determining Bakers equation results and cleaning data
+---
+
+```{r}
+# discrimnant function key points
+# coefficients.
+a1 <- 0.46
+a2 <- 3.15
+a3 <- 2.94
+
+# discriminant point
+discriminant_point <- 77.41
+```
+
+```{r}
+#applying discriminant function to basline data
+# Apply the discriminant function and create a new column
+baseline_data <- baseline_data %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M")
+  )
+
+# Print the modified dataset
+print(baseline_data[,c("Band_Number", "DNA_sex", "Bakers_sex")])
+
+# Calculate the number of matches and non-matches
+comparison_table <- table(DNA_sex = baseline_data$DNA_sex, Bakers_sex = baseline_data$Bakers_sex)
+
+# Print the comparison table
+print(comparison_table)
+
+# Calculate the number of matches and non-matches
+num_matches <- sum(baseline_data$DNA_sex == baseline_data$Bakers_sex)
+num_non_matches <- sum(baseline_data$DNA_sex != baseline_data$Bakers_sex)
+accuracy_baseline <-  sum((num_matches / (num_matches+num_non_matches) * 100))
+accuracy_baseline_per <- sprintf("%.2f%%", accuracy_baseline)
+
+# Print the numbers of matches and non-matches
+print(paste("Number of matches:", num_matches))
+print(paste("Number of non-matches:", num_non_matches))
+print(paste("Bakers Equation Basline Accuracy:", accuracy_baseline_per))
+```
+
+```{r}
+#Bakers equation, full dataset
+#First run through only using Bakers equation sex results, then we will modify data using DNA sex results as the reliable result
+
+# Apply the discriminant function and create a new column
+full_data <- full_data %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M")
+  )
+
+# Print the modified dataset
+print(full_data[,c("Band_Number", "DNA_sex", "Bakers_sex")])
+#print datapoints that are NA to confirm rational for NA result
+print(full_data[is.na(full_data$Bakers_sex), c("Band_Number", "Bakers_sex", "DNA_sex", "Bill_Length", "Bill_Depth", "Bill_Width")])
+
+#No calculation of Bakers equation accuracy as sex is not known only modeled. 
+```
+T2086 is the only data point to not produce a Bakers sex from the morph_traits due to a non recorded bill length
+
+```{r}
+# code to create single sex result. DNA sex will take precedence over Bakers sex due to its higher reliability
+
+full_data_combined <- full_data %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M"),
+    Full_Sex = if_else(is.na(DNA_sex) | DNA_sex %in% c("NO SAMPLE", "X"), Bakers_sex, DNA_sex)
+)%>%
+ filter(!is.na(Full_Sex))
+  
+print(full_data_combined[,c("Band_Number", "DNA_sex", "Full_Sex", "Bakers_sex")])
+```
+
+```{r}
+# Compare data in x and y columns to assess if they can be combined
+columns_to_compare <- c("Flag_Colour", "Easting", "Northing", "Flag_Code", "GPS_Tag_ID", "Date")
+
+# NA data is irrelevant in this process, and can return false results
+full_data_combined_2 <- na.omit(full_data_combined)
+
+results <- vector("list", length(columns_to_compare))
+
+for (col_name in columns_to_compare) {
+  col_name_x <- paste0(col_name, ".x")
+  col_name_y <- paste0(col_name, ".y")
+  
+  contingency_table_x <- table(full_data_combined_2[[col_name_x]])
+  contingency_table_y <- table(full_data_combined_2[[col_name_y]])
+  
+  if(identical(contingency_table_x, contingency_table_y)) {
+    result <- paste("Data is the same in", col_name, "columns.")
+  } else {
+    result <- paste("Data is different in", col_name, "columns.")
+  }
+  
+  results[[col_name]] <- result
+}
+
+for (result in results) {
+  print(result)
+}
+
+#combine the identical columns while leaving non-identical columns
+#Date, Flag Colour, Flag Code, and GPS Tag ID are identical
+identical_column_pairs <- list(
+  c("Date.x", "Date.y"),
+  c("Flag_Colour.x", "Flag_Colour.y"),
+  c("Flag_Code.x", "Flag_Code.y"),
+  c("GPS_Tag_ID.x", "GPS_Tag_ID.y")
+)
+
+full_data_combined_3 <- full_data_combined
+
+for (pair in identical_column_pairs) {
+  combined_column_name <- sub("\\.x$","", pair[1])
+  full_data_combined_3[[combined_column_name]] <- coalesce(full_data_combined_3[[pair[1]]], full_data_combined_3[[pair[2]]])
+  
+  full_data_combined_3 <- full_data_combined_3 %>%
+    select(-one_of(pair))
+}
+
+print(full_data_combined_3)
+```
+Data in GPS Tag ID initially different, 0's recorded as O's in original sex data
+
+---
+Singular Morphological Trait Correlation to sex - full data
+---
+
+```{r}
+# Weight
+# weight correlation to sex visualisation
+
+summary_data_Weight <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_weight = mean(Weight, na.rm = TRUE),
+    Q1 = quantile(Weight, 0.25, na.rm = TRUE),
+    Q3 = quantile(Weight, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Weight)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea weight visualisation", x = "", y = "Tōrea Weight (kg)") +
+  scale_fill_manual(values = c("Weight" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Weight, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_weight, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_weight <- cor(full_data_combined_3$Weight, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_weight)
+
+#calculate the T-test correlation
+t_test_result_weight <- t.test(Weight ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_weight)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Weight)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Weight, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_weight <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Weight, y = predicted_prob_weight)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Weight", x = "Weight (kg)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Bill Length
+# Bill Length correlation to sex visualisation
+
+summary_data_Bill_Length <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_Bill_Length = mean(Bill_Length, na.rm = TRUE),
+    Q1 = quantile(Bill_Length, 0.25, na.rm = TRUE),
+    Q3 = quantile(Bill_Length, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Bill_Length)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea Bill Length visualisation", x = "", y = "Tōrea Bill Length (mm)") +
+  scale_fill_manual(values = c("Bill_Length" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Bill_Length, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_Bill_Length, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_Bill_Lenght <- cor(full_data_combined_3$Bill_Length, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_Bill_Lenght)
+
+#calculate the T-test correlation
+t_test_result_Bill_Length <- t.test(Bill_Length ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_Bill_Length)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Bill_Length)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Bill_Length, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Bill_Length <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Bill_Length, y = predicted_prob_Bill_Length)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Bill Length", x = "Bill Length (mm)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Bill Depth
+# Bill Depth correlation to sex visualisation
+
+summary_data_Bill_Depth <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_Bill_Depth = mean(Bill_Depth, na.rm = TRUE),
+    Q1 = quantile(Bill_Depth, 0.25, na.rm = TRUE),
+    Q3 = quantile(Bill_Depth, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Bill_Depth)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea Bill Depth visualisation", x = "", y = "Tōrea Bill Depth (mm)") +
+  scale_fill_manual(values = c("Bill_Depth" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Bill_Depth, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_Bill_Depth, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_Bill_Depth <- cor(full_data_combined_3$Bill_Depth, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_Bill_Depth)
+
+#calculate the T-test correlation
+t_test_result_Bill_Depth <- t.test(Bill_Depth ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_Bill_Depth)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Bill_Depth)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Bill_Depth, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Bill_Depth <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Bill_Depth, y = predicted_prob_Bill_Depth)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Bill Depth", x = "Bill Depth (mm)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Bill Width
+# Bill Width correlation to sex visualisation
+
+summary_data_Bill_Width <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_Bill_Width = mean(Bill_Width, na.rm = TRUE),
+    Q1 = quantile(Bill_Width, 0.25, na.rm = TRUE),
+    Q3 = quantile(Bill_Width, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Bill_Width)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea Bill Width visualisation", x = "", y = "Tōrea Bill Width (mm)") +
+  scale_fill_manual(values = c("Bill_Width" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Bill_Width, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_Bill_Width, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_Bill_Width <- cor(full_data_combined_3$Bill_Width, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_Bill_Width)
+
+#calculate the T-test correlation
+t_test_result_Bill_Width <- t.test(Bill_Width ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_Bill_Width)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Bill_Width)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Bill_Width, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Bill_Width <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Bill_Width, y = predicted_prob_Bill_Width)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Bill Width", x = "Bill Width (mm)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Wing Length
+# Wing correlation to sex visualisation
+
+summary_data_Wing_Length <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_Wing_Length = mean(Wing_Length, na.rm = TRUE),
+    Q1 = quantile(Wing_Length, 0.25, na.rm = TRUE),
+    Q3 = quantile(Wing_Length, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Wing_Length)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea Wing Length visualisation", x = "", y = "Tōrea Wing Length (mm)") +
+  scale_fill_manual(values = c("Wing_Length" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Wing_Length, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_Wing_Length, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_Wing_Length <- cor(full_data_combined_3$Wing_Length, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_Wing_Length)
+
+#calculate the T-test correlation
+t_test_result_Wing_Length <- t.test(Wing_Length ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_Wing_Length)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Wing_Length)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Wing_Length, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Wing_Length <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Wing_Length, y = predicted_prob_Wing_Length)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Wing Length", x = "Wing Length (mm)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Tarsus Length
+# Tarsus Length correlation to sex visualisation
+
+summary_data_Tarsus_Length <- full_data_combined_3 %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    mean_Tarsus_Length = mean(Tarsus_Length, na.rm = TRUE),
+    Q1 = quantile(Tarsus_Length, 0.25, na.rm = TRUE),
+    Q3 = quantile(Tarsus_Length, 0.75, na.rm = TRUE)
+  )
+
+# Plot the data
+ggplot(full_data_combined_3, aes(x = "", y = Tarsus_Length)) + 
+  geom_boxplot() + 
+  geom_jitter(width = 0.2, alpha = 0.5) + 
+  labs(title = "Tōrea Tarsus Length visualisation", x = "", y = "Tōrea Tarsus Length (mm)") +
+  scale_fill_manual(values = c("Tarsus_Length" = "lightblue")) + 
+  theme_minimal() + 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5),  axis.text.x = element_blank(), axis.ticks.x = element_blank()) +
+  facet_wrap(~Full_Sex) +
+  geom_text(data = summary_data_Tarsus_Length, aes(x = 0.2, y = Q3, label = paste("Avg:", round(mean_Tarsus_Length, 2), "\nQ1:", round(Q1, 2), "\nQ3:", round(Q3, 2))), 
+            vjust = -1, size = 3, position = position_dodge(width = 0.75))
+
+# correlation testing
+# Encode Full_Sex as a numeric variable
+full_data_combined_3$Sex_numeric <- ifelse(full_data_combined_3$Full_Sex == "F", 1, 0)
+
+# Calculate the point-biserial correlation
+cor_result_Tarsus_Length <- cor(full_data_combined_3$Tarsus_Length, full_data_combined_3$Sex_numeric, use = "complete.obs", method = "pearson")
+print(cor_result_Tarsus_Length)
+
+#calculate the T-test correlation
+t_test_result_Tarsus_Length <- t.test(Tarsus_Length ~ Full_Sex, data = full_data_combined_3, na.action = na.omit)
+print(t_test_result_Tarsus_Length)
+
+#calculate the logistic regression
+
+cleaned_data <- full_data_combined_3 %>% drop_na(Tarsus_Length)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Tarsus_Length, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Tarsus_Length <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Tarsus_Length, y = predicted_prob_Tarsus_Length)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Tarsus Length", x = "Tarsus Length (mm)", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Bill Shape
+# Chi-Squared test
+contingency_table_Bill_Shape <- table(full_data_combined_3$Full_Sex, full_data_combined_3$Bill_Shape)
+
+chi_square_test_Bill_Shape <- chisq.test(contingency_table_Bill_Shape)
+
+print(paste("chi sqaure:",chi_square_test_Bill_Shape))
+
+# Fishers Exact Test
+fisher_test_Bill_Shape <- fisher.test(contingency_table_Bill_Shape)
+
+print(fisher_test_Bill_Shape)
+
+# Cramers V
+cramers_v_Bill_Shape <- assocstats(contingency_table_Bill_Shape)$cramer
+
+print(paste("cramers V:", cramers_v_Bill_Shape))
+
+# Logistic Regression Model
+cleaned_data <- full_data_combined_3 %>% drop_na(Bill_Shape)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Bill_Shape, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Bill_Shape <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Bill_Shape, y = predicted_prob_Bill_Shape)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Bill Shape", x = "Bill Shape", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Note: only one bird with a blunt beak, it is female
+Note: 7 birds with intermediate beaks, all male
+```{r}
+# Bill Colour
+# Chi-Squared test
+contingency_table_Bill_Colour <- table(full_data_combined_3$Full_Sex, full_data_combined_3$Bill_Colour)
+
+chi_square_test_Bill_Colour <- chisq.test(contingency_table_Bill_Colour)
+
+print(paste("chi sqaure:",chi_square_test_Bill_Colour))
+
+# Fishers Exact Test
+fisher_test_Bill_Colour <- fisher.test(contingency_table_Bill_Colour)
+
+print(fisher_test_Bill_Colour)
+
+# Cramers V
+cramers_v_Bill_Colour <- assocstats(contingency_table_Bill_Colour)$cramer
+
+print(paste("cramers V:", cramers_v_Bill_Colour))
+
+# Logistic Regression Model
+cleaned_data <- full_data_combined_3 %>% drop_na(Bill_Colour)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Bill_Colour, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+print(logistic_model)
+
+cleaned_data$predicted_prob_Bill_Colour <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Bill_Colour, y = predicted_prob_Bill_Colour)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Bill Colour", x = "Bill Colour", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Leg Colour
+# Chi-Squared test
+contingency_table_Leg_Colour <- table(full_data_combined_3$Full_Sex, full_data_combined_3$Leg_Colour)
+
+chi_square_test_Leg_Colour <- chisq.test(contingency_table_Leg_Colour)
+
+print(paste("chi sqaure:",chi_square_test_Leg_Colour))
+
+# Fishers Exact Test
+fisher_test_Leg_Colour <- fisher.test(contingency_table_Leg_Colour)
+
+print(fisher_test_Leg_Colour)
+
+# Cramers V
+cramers_v_Leg_Colour <- assocstats(contingency_table_Leg_Colour)$cramer
+
+print(paste("cramers V:", cramers_v_Leg_Colour))
+
+# Logistic Regression Model
+cleaned_data <- full_data_combined_3 %>% drop_na(Leg_Colour)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Leg_Colour, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+print(logistic_model)
+
+cleaned_data$predicted_prob_Leg_Colour <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Leg_Colour, y = predicted_prob_Leg_Colour)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Leg Colour", x = "Leg Colour", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+# Iris Colour
+# Chi-Squared test
+contingency_table_Iris_Colour <- table(full_data_combined_3$Full_Sex, full_data_combined_3$Iris_Colour)
+
+chi_square_test_Iris_Colour <- chisq.test(contingency_table_Iris_Colour)
+
+print(paste("chi sqaure:",chi_square_test_Iris_Colour))
+
+# Fishers Exact Test
+fisher_test_Iris_Colour <- fisher.test(contingency_table_Iris_Colour)
+
+print(fisher_test_Iris_Colour)
+
+# Cramers V
+cramers_v_Iris_Colour <- assocstats(contingency_table_Iris_Colour)$cramer
+
+print(paste("cramers V:", cramers_v_Iris_Colour))
+
+# Logistic Regression Model
+cleaned_data <- full_data_combined_3 %>% drop_na(Iris_Colour)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Iris_Colour, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Iris_Colour <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Iris_Colour, y = predicted_prob_Iris_Colour)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Iris Colour", x = "Iris Colour", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Note: one bird with brown iris, it is female
+```{r}
+# Iris Fleck
+# Chi-Squared test
+contingency_table_Iris_Fleck <- table(full_data_combined_3$Full_Sex, full_data_combined_3$Iris_Fleck)
+
+chi_square_test_Iris_Fleck <- chisq.test(contingency_table_Iris_Fleck)
+
+print(paste("chi sqaure:",chi_square_test_Iris_Fleck))
+
+# Fishers Exact Test
+fisher_test_Iris_Fleck <- fisher.test(contingency_table_Iris_Fleck)
+
+print(fisher_test_Iris_Fleck)
+
+# Cramers V
+cramers_v_Iris_Fleck <- assocstats(contingency_table_Iris_Fleck)$cramer
+
+print(paste("cramers V:", cramers_v_Iris_Fleck))
+
+# Logistic Regression Model
+cleaned_data <- full_data_combined_3 %>% drop_na(Iris_Fleck)
+
+cleaned_data$Full_Sex <- factor(cleaned_data$Full_Sex, levels = c("M", "F"))
+
+logistic_model <- glm(Full_Sex ~ Iris_Fleck, data = cleaned_data, family = binomial)
+
+summary(logistic_model)
+
+cleaned_data$predicted_prob_Iris_Fleck <- predict(logistic_model, type = "response")
+
+ggplot(cleaned_data, aes(x = Iris_Fleck, y = predicted_prob_Iris_Fleck)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Predicted Probability of Being Female by Iris Fleck", x = "Iris FLeck", y = "Predicted Probability") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+Note: only one bird with L Large and R slight, it is female
+
+
+---
+Singular Morphological Trait Correlation to sex - baseline data
+---
+

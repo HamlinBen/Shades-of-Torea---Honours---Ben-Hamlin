@@ -1,0 +1,443 @@
+---
+title: "MCA stuff"
+author: "Ben Hamlin"
+date: "2024-09-12"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+library(FactoMineR)
+library(factoextra)
+library(ggrepel)
+library(s20x)
+library(car)
+library(ResourceSelection)
+library(caret)
+library(pROC)
+library(nlme)
+library(MASS)
+```
+
+```{r}
+#data used
+torea_filtered_berd <- torea_filtered_berd
+str(torea_filtered_berd)
+```
+```{r}
+# full data
+Torea_data <- Torea_data
+#Coalescing Iris colour
+torea_data <- Torea_data %>%
+  mutate(
+    Iris_Colour = case_when(
+      Iris_Colour %in% c("Brown","Brown-Orange","Orange-brown", "Dull orange","Orange","Orange-red", "Red-orange") ~ "Brown-red", 
+        Iris_Colour %in% c("Dull red","Red") ~ "Red",
+         TRUE ~ Iris_Colour))
+unique(torea_data$Iris_Colour)
+str(torea_data)
+```
+
+
+```{r}
+# correspondence analysis of Bill colour vs leg colour
+#form data
+bclc_table <- table(torea_filtered_berd$Bill_Colour, torea_filtered_berd$Leg_Colour)
+print(bclc_table)
+str(bclc_table)
+
+#Test
+ca_bclc <- CA(bclc_table, graph = FALSE)
+print(ca_bclc)
+str(ca_bclc)
+print(ca_bclc$eig)
+print(ca_bclc$row$coord)
+print(ca_bclc$col$coord)
+
+
+```
+
+```{r}
+#attempt to generate results with full data
+# correspondence analysis of Bill colour vs leg colour
+#form data
+bclc_table_2 <- table(Torea_data$Bill_Colour, Torea_data$Leg_Colour)
+print(bclc_table_2)
+str(bclc_table_2)
+
+#Test
+ca_bclc_2 <- CA(bclc_table_2, graph = FALSE)
+print(ca_bclc_2)
+str(ca_bclc_2)
+print(ca_bclc_2$eig)
+print(ca_bclc_2$row$coord)
+print(ca_bclc_2$col$coord)
+
+
+```
+
+
+
+```{r}
+# correspondence analysis of Bill colour vs Iris colour
+#form data
+bcic_table <- table(torea_filtered_berd$Bill_Colour, torea_filtered_berd$Iris_Colour)
+print(bcic_table)
+str(bcic_table)
+
+#Test
+ca_bcic <- CA(bcic_table, graph = FALSE)
+print(ca_bcic)
+str(ca_bcic)
+print(ca_bcic$eig)
+print(ca_bcic$row$coord)
+print(ca_bcic$col$coord)
+
+
+```
+
+```{r}
+#attempt to generate results with full data
+# correspondence analysis of Bill colour vs Iris colour
+
+bcic_table_2 <- table(torea_data$Bill_Colour, torea_data$Iris_Colour)
+print(bcic_table_2)
+str(bcic_table_2)
+
+#Test
+ca_bcic_2 <- CA(bcic_table_2, graph = FALSE)
+print(ca_bcic_2)
+str(ca_bcic_2)
+print(ca_bcic_2$eig)
+print(ca_bcic_2$row$coord)
+print(ca_bcic_2$col$coord)
+
+
+```
+
+```{r}
+# correspondence analysis of Leg colour vs Iris colour
+#form data
+lcic_table <- table(torea_filtered_berd$Leg_Colour, torea_filtered_berd$Iris_Colour)
+print(lcic_table)
+str(lcic_table)
+
+#Test
+ca_lcic <- CA(lcic_table, graph = FALSE)
+print(ca_lcic)
+str(ca_lcic)
+print(ca_lcic$eig)
+print(ca_lcic$row$coord)
+print(ca_lcic$col$coord)
+
+#plot correspondence
+fviz_ca_biplot(ca_lcic, repel =TRUE, ggtheme = theme_minimal())
+
+ca_results <- list(eigenvalues = ca_lcic$eig,
+                   row_coords = ca_lcic$row$coord,
+                   col_coords = ca_lcic$col$coord)
+
+ggplot() +
+  geom_point(aes(x = ca_results$row_coords[,1], y = ca_results$row_coords[,2]), color = "blue") +
+  geom_point(aes(x = ca_results$col_coords[,1], y = ca_results$col_coords[,2]), color = "red") +
+  geom_text_repel(aes(x = ca_results$row_coords[,1], y = ca_results$row_coords[,2], label = rownames(ca_results$row_coords)), color = "blue") +
+  geom_text_repel(aes(x = ca_results$col_coords[,1], y = ca_results$col_coords[,2], label = rownames(ca_results$col_coords)), color = "red") +
+  labs(x = "Dimension 1", y = "Dimension 2", title = "Correspondence Analysis of Leg Colour ~ Iris Colour") +
+  theme_minimal()
+
+#return coordinates as dataset
+row_coords <- as.data.frame(ca_lcic$row$coord)
+row_coords$Colour <- rownames(ca_lcic$row$coord)
+print(row_coords)
+
+
+torea_filtered_berd_lcic <- torea_filtered_berd %>% 
+  left_join(row_coords, by = c("Leg_Colour" = "Colour"))
+
+#lm model full Sex
+torea_lcic_clean <- torea_filtered_berd_lcic %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(`Dim 1`) &
+  !is.na(`Dim 2`))
+
+lm_lcici <- lm(Body_condition_TL ~ Full_Sex+`Dim 1`+`Dim 2`+Full_Sex*(`Dim 1`+`Dim 2`), data = torea_lcic_clean)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(lm_lcic, lambda = seq(-2, 2, by = 0.1))
+
+lo_lcic <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_lcic
+
+if (lo_lcic == 0) {
+  torea_lcic_clean$Body_condition_TL_transformed <- log(torea_lcic_clean$Body_condition_TL + 1)
+} else {
+  torea_lcic_clean$Body_condition_TL_transformed <- (torea_lcic_clean$Body_condition_TL^lo_lcic - 1) / lo_lcic
+}
+
+lm_lcic <- lm(Body_condition_TL_transformed ~ DNA_sex + `Dim 1` + `Dim 2` + DNA_sex * (`Dim 1` + `Dim 2`), data = torea_lcic_clean)
+
+summary(lm_lcic)
+anova(lm_lcic)
+
+#checking
+#plotting residuals
+plot(lm_lcic, which=1)
+
+#co-linearity test
+vif(lm_lcic)
+
+#normality
+#create shapiro wilks
+residuals_lcic <- residuals(lm_lcic)
+SWt_lcic <- shapiro.test(residuals_lcic)
+
+#q-q with S-W
+qqnorm(residuals_lcic, main = "Normal Q-Q")
+qqline(residuals_lcic, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_lcic$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_lcic$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#cross validation
+train_control <- trainControl(method = "cv", number = 10)
+cv_model <- train(Body_condition_TL_transformed ~ Full_Sex + `Dim 1` + `Dim 2`, data = torea_lcic_clean, method = "lm", trControl = train_control)
+print(cv_model)
+
+
+
+
+
+
+
+
+
+
+
+
+#lm for DNA_sex only
+torea_lcic_clean_2 <- torea_filtered_berd_lcic
+torea_lcic_clean_2$DNA_sex <- ifelse(
+  torea_lcic_clean_2$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_lcic_clean_2$DNA_sex)
+
+torea_lcic_clean_2 <- torea_lcic_clean_2 %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(DNA_sex) &
+  !is.na(`Dim 1`) &
+  !is.na(`Dim 2`))
+
+lm_lcic_2i <- lm(Body_condition_TL ~ DNA_sex+`Dim 1`+`Dim 2`+DNA_sex*(`Dim 1`+`Dim 2`), data = torea_lcic_clean_2)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(lm_lcic_2i, lambda = seq(-2, 2, by = 0.1))
+
+lo_lcic_2 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_lcic_2
+
+if (lo_lcic_2 == 0) {
+  torea_lcic_clean_2$Body_condition_TL_transformed <- log(torea_lcic_clean_2$Body_condition_TL + 1)
+} else {
+  torea_lcic_clean_2$Body_condition_TL_transformed <- (torea_lcic_clean_2$Body_condition_TL^lo_lcic_2 - 1) / lo_lcic_2
+}
+
+lm_lcic_2 <- lm(Body_condition_TL_transformed ~ DNA_sex + `Dim 1` + `Dim 2` + DNA_sex * (`Dim 1` + `Dim 2`), data = torea_lcic_clean_2)
+
+summary(lm_lcic_2)
+anova(lm_lcic_2)
+
+#checking
+#plotting residuals
+plot(lm_lcic_2, which=1)
+
+#co-linearity test
+vif(lm_lcic_2)
+
+#normality
+#create shapiro wilks
+residuals_lcic_2 <- residuals(lm_lcic_2)
+SWt_lcic_2 <- shapiro.test(residuals_lcic_2)
+
+#q-q with S-W
+qqnorm(residuals_lcic_2, main = "Normal Q-Q")
+qqline(residuals_lcic_2, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_lcic_2$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_lcic_2$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#cross validation
+train_control <- trainControl(method = "cv", number = 10)
+cv_model <- train(Body_condition_TL_transformed ~ Full_Sex + `Dim 1` + `Dim 2`, data = torea_lcic_clean_2, method = "lm", trControl = train_control)
+print(cv_model)
+
+
+```
+
+
+```{r}
+# generate an MCA based on leg, iris, and bill colour
+#drop na
+torea_filtered_MCA <- torea_filtered_berd %>%
+  drop_na("Leg_Colour", "Bill_Colour", "Iris_Colour")
+
+mca_bpc <- MCA(torea_filtered_MCA[,c("Leg_Colour", "Bill_Colour", "Iris_Colour")], graph = FALSE)
+print(mca_bpc)
+summary(mca_bpc)
+
+
+
+#prepare lm
+mca_bpc_cord <- mca_bpc$ind$coord[, 1:2]
+torea_filtered_MCA <- torea_filtered_MCA %>% 
+  bind_cols(as.data.frame(mca_bpc_cord)) %>%
+  rename(MCA1 = `Dim 1`, MCA2 = `Dim 2`)
+
+print(torea_filtered_MCA$MCA1)
+
+torea_bpc_clean <- torea_filtered_MCA
+torea_bpc_clean$DNA_sex <- ifelse(
+  torea_bpc_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_bpc_clean$DNA_sex)
+
+torea_bpc_clean <- torea_bpc_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(DNA_sex) &
+  !is.na(MCA1) &
+  !is.na(MCA2))
+print(torea_bpc_clean)
+
+lm_bpc <- lm(Body_condition_TL ~ MCA1 + MCA2 + Full_Sex +Full_Sex*(MCA1+MCA2), data = torea_bpc_clean)
+
+summary(lm_bpc)
+anova(lm_bpc)
+#visualisation
+fviz_mca_biplot(mca_bpc, repel = TRUE, ggtheme = theme_minimal())
+
+
+ggplot(torea_filtered_MCA, aes(x = MCA1, y = MCA2, color = Full_Sex)) +
+  geom_point() +
+  labs(title = "Body Condition by MCA Dimensions",
+       x = "MCA Dimension 1",
+       y = "MCA Dimension 2",
+       color = "Sex") +
+  theme_minimal()
+
+ggplot(torea_filtered_MCA, aes(x = MCA1, y = MCA2, color = Full_Sex, shape = Full_Sex)) +
+  geom_point(size = 3) +
+  geom_text(aes(label = rownames(torea_filtered_MCA)), 
+            vjust = -1, 
+            size = 3, 
+            check_overlap = TRUE) +  
+  labs(title = "Body Condition by MCA Dimensions",
+       x = "MCA Dimension 1",
+       y = "MCA Dimension 2",
+       color = "Sex",
+       shape = "Sex") + 
+  theme_minimal() +
+  theme(legend.position = "top")
+
+
+#boxcox and suchlike
+
+boxcox_result <- boxcox(lm_bpc, lambda = seq(-2, 2, by = 0.1))
+
+lo_bpc <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_bpc
+
+if (lo_bpc == 0) {
+  torea_bpc_clean$Body_condition_TL_transformed <- log(torea_bpc_clean$Body_condition_TL + 1)
+} else {
+  torea_bpc_clean$Body_condition_TL_transformed <- (torea_bpc_clean$Body_condition_TL^lo_bpc - 1) / lo_bpc
+}
+
+lm_bpc2 <- lm(Body_condition_TL_transformed ~ MCA1 + MCA2 + DNA_sex +DNA_sex*(MCA1+MCA2), data = torea_bpc_clean)
+
+summary(lm_bpc2)
+anova(lm_bpc2)
+
+#assumptions test
+coef(lm_bpc2)
+#fitted residuals
+plot(lm_bpc2, which = 1)
+
+#normality
+#create shapiro wilks
+residuals_lm_bpc2 <- residuals(lm_bpc2)
+SWt_lm_bpc2 <- shapiro.test(residuals_lm_bpc2)
+
+#q-q with S-W
+qqnorm(residuals_lm_bpc2, main = "Normal Q-Q")
+qqline(residuals_lm_bpc2, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_lm_bpc2$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_lm_bpc2$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_lm_bpc2, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_lm_bpc2 <- cooks20x(lm_bpc2)
+
+hip_lm_bpc2 <- which(cooks_lm_bpc2 > 0.4)
+if(length(hip_lm_bpc2) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_lm_bpc2)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(lm_bpc2)
+```
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

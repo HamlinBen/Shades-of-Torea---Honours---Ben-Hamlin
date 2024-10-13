@@ -1,0 +1,324 @@
+---
+title: "bakers function score vis"
+author: "Ben Hamlin"
+date: "2024-09-03"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+```
+
+```{r}
+#import
+torea_data_berd <- torea_data_cor
+```
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_data_berd$DNA_sex <- ifelse(torea_data_berd$DNA_sex %in% c("NO SAMPLE", "X"), "NO SAMPLE", torea_data_berd$DNA_sex)
+torea_data_berd$DNA_sex[is.na(torea_data_berd$DNA_sex)] <- "NO SAMPLE"
+#allows for known sex to always appear on top
+torea_data_berd$alpha <- ifelse(torea_data_berd$DNA_sex %in% c("M", "F"), 1, 0.7)
+#check data import 
+str(torea_data_berd)
+table(torea_data_berd$DNA_sex)
+```
+
+```{r}
+#viewing discriminant score compared to traits - continuous
+
+# discriminant score vs torea weight by sex
+corr_test_dsw <- cor.test(torea_data_berd$Weight, torea_data_berd$discriminant_score)
+corr_coeff_dsw <- round(corr_test_dsw$estimate, 2)
+p_value_dsw <- corr_test_dsw$p.value
+p_value_text_dsw <- format.pval(p_value_dsw)
+
+ggplot(torea_data_berd, aes(x = Weight, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Weight (g)", y = "Discriminant Score", color = "Sex", title = "Torea Weight vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsw, "P-value:", p_value_text_dsw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea bill length by sex
+corr_test_dsbl <- cor.test(torea_data_berd$Bill_Length, torea_data_berd$discriminant_score)
+corr_coeff_dsbl <- round(corr_test_dsbl$estimate, 2)
+p_value_dsbl <- corr_test_dsbl$p.value
+p_value_text_dsbl <- format.pval(p_value_dsbl)
+
+ggplot(torea_data_berd, aes(x = Bill_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbl, "P-value:", p_value_text_dsbl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+num_points <- nrow(torea_data_berd)
+print(num_points)
+# discriminant score vs torea bill depth by sex
+corr_test_dsbd <- cor.test(torea_data_berd$Bill_Depth, torea_data_berd$discriminant_score)
+corr_coeff_dsbd <- round(corr_test_dsbd$estimate, 2)
+p_value_dsbd <- corr_test_dsbd$p.value
+p_value_text_dsbd <- format.pval(p_value_dsbd)
+
+ggplot(torea_data_berd, aes(x = Bill_Depth, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Depth (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill Depth vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbd, "P-value:", p_value_text_dsbd),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea bill Width by sex
+corr_test_dsbw <- cor.test(torea_data_berd$Bill_Width, torea_data_berd$discriminant_score)
+corr_coeff_dsbw <- round(corr_test_dsbw$estimate, 2)
+p_value_dsbw <- corr_test_dsbw$p.value
+p_value_text_dsbw <- format.pval(p_value_dsbw)
+
+ggplot(torea_data_berd, aes(x = Bill_Width, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Width (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill Width vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbw, "P-value:", p_value_text_dsbw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea Wing length by sex
+corr_test_dswl <- cor.test(torea_data_berd$Wing_Length, torea_data_berd$discriminant_score)
+corr_coeff_dswl <- round(corr_test_dswl$estimate, 2)
+p_value_dswl <- corr_test_dswl$p.value
+p_value_text_dswl <- format.pval(p_value_dswl)
+
+ggplot(torea_data_berd, aes(x = Wing_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Wing Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea wing length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dswl, "P-value:", p_value_text_dswl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea Tarsus length by sex
+corr_test_dstl <- cor.test(torea_data_berd$Tarsus_Length, torea_data_berd$discriminant_score)
+corr_coeff_dstl <- round(corr_test_dstl$estimate, 2)
+p_value_dstl <- corr_test_dstl$p.value
+p_value_text_dstl <- format.pval(p_value_dstl)
+
+ggplot(torea_data_berd, aes(x = Tarsus_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Tarsus Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea tarsus length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dstl, "P-value:", p_value_text_dstl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea body condition by sex
+corr_test_dsbc <- cor.test(torea_data_berd$Body_condition_TL, torea_data_berd$discriminant_score)
+corr_coeff_dsbc <- round(corr_test_dsbc$estimate, 2)
+p_value_dsbc <- corr_test_dsbc$p.value
+p_value_text_dsbc <- format.pval(p_value_dsbc)
+
+ggplot(torea_data_berd, aes(x = Body_condition_TL, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Body Condition", y = "Discriminant Score", color = "Sex", title = "Torea body condition vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbc, "P-value:", p_value_text_dsbc),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# assessing body condition compared to categorical variables
+
+# discriminant score vs bill colour by sex
+torea_data_berd_vis1 <- torea_data_berd %>%
+  filter(!is.na(Bill_Colour))
+torea_data_berd_vis1$Bill_Colour <- as.factor(torea_data_berd_vis1$Bill_Colour)
+
+anova_dsbc <- aov(discriminant_score ~ Bill_Colour, data = torea_data_berd_vis1)
+anova_sum_dsbc <- summary(anova_dsbc)[[1]]
+p_value_dsbc <- anova_sum_dsbc["Bill_Colour", "Pr(>F)"]
+f_value_dsbc <- anova_sum_dsbc["Bill_Colour", "F value"]
+anova_text_dsbc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsbc, 2), "\n",
+  "p-value = ", format.pval(p_value_dsbc)
+)
+
+ggplot(torea_data_berd_vis1, aes(x = Bill_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Colour", y = "Discriminant Score", color = "Sex", title = "Torea bill colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsbc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs leg colour by sex
+torea_data_berd_vis2 <- torea_data_berd %>%
+  filter(!is.na(Leg_Colour))
+torea_data_berd_vis2$Leg_Colour <- as.factor(torea_data_berd_vis2$Leg_Colour)
+
+anova_dslc <- aov(discriminant_score ~ Leg_Colour, data = torea_data_berd_vis2)
+anova_sum_dslc <- summary(anova_dslc)[[1]]
+p_value_dslc <- anova_sum_dslc["Leg_Colour", "Pr(>F)"]
+f_value_dslc <- anova_sum_dslc["Leg_Colour", "F value"]
+anova_text_dslc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dslc, 2), "\n",
+  "p-value = ", format.pval(p_value_dslc)
+)
+
+ggplot(torea_data_berd_vis2, aes(x = Leg_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Leg Colour", y = "Discriminant Score", color = "Sex", title = "Torea leg colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dslc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs Iris colour by sex
+torea_data_berd_vis3 <- torea_data_berd %>%
+  filter(!is.na(Iris_Colour))
+torea_data_berd_vis3$Iris_Colour <- as.factor(torea_data_berd_vis3$Iris_Colour)
+
+anova_dsic <- aov(discriminant_score ~ Iris_Colour, data = torea_data_berd_vis3)
+anova_sum_dsic <- summary(anova_dsic)[[1]]
+p_value_dsic <- anova_sum_dsic["Iris_Colour", "Pr(>F)"]
+f_value_dsic <- anova_sum_dsic["Iris_Colour", "F value"]
+anova_text_dsic <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsic, 2), "\n",
+  "p-value = ", format.pval(p_value_dsic)
+)
+
+ggplot(torea_data_berd_vis3, aes(x = Iris_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Colour", y = "Discriminant Score", color = "Sex", title = "Torea iris colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsic,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs iris fleck by sex
+torea_data_berd_vis4 <- torea_data_berd %>%
+  filter(!is.na(Iris_Fleck))
+torea_data_berd_vis4$Iris_Fleck <- as.factor(torea_data_berd_vis4$Iris_Fleck)
+
+anova_dsif <- aov(discriminant_score ~ Iris_Fleck, data = torea_data_berd_vis4)
+anova_sum_dsif <- summary(anova_dsif)[[1]]
+p_value_dsif <- anova_sum_dsif["Iris_Fleck", "Pr(>F)"]
+f_value_dsif <- anova_sum_dsif["Iris_Fleck", "F value"]
+anova_text_dsif <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsif, 2), "\n",
+  "p-value = ", format.pval(p_value_dsif)
+)
+
+ggplot(torea_data_berd_vis4, aes(x = Iris_Fleck, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Fleck", y = "Discriminant Score", color = "Sex", title = "Torea iris fleck vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsif,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+
+

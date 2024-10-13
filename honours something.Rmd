@@ -1,0 +1,143 @@
+---
+title: "Untitled"
+author: "Ben Hamlin"
+date: "2024-09-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#full lm for bill colour:sex ~ bC
+torea_filter_clean$Bill_Colour<- as.factor(torea_filter_clean$Bill_Colour)
+
+#clean data
+torea_filter_clean_BC1 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Bill_Colour))
+ 
+#lm
+te1<- lm(Body_condition_TL~Full_Sex+Bill_Colour+Full_Sex*Bill_Colour, data = torea_filter_clean_BC1)
+
+
+summary(te1)
+
+#assumptions test
+coef(te1)
+#fitted residuals
+plot(te1, which = 1)
+
+#normality
+#create shapiro wilks
+residuals_te1 <- residuals(te1)
+SWt_te1 <- shapiro.test(residuals_te1)
+
+#q-q with S-W
+qqnorm(residuals_te1, main = "Normal Q-Q")
+qqline(residuals_te1, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te1$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te1$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te1, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te1 <- cooks20x(te1)
+
+hip_te1 <- which(cooks_te1 > 0.4)
+if(length(hip_te1) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te1)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te1)
+```
+
+
+
+
+
+
+```{r}
+#visualisations with transformed data
+torea_filter_clean1 <- torea_filter_clean %>%
+  filter (!is.na(Bill_Colour))
+ torea_filter_clean1$Body_condition_TL_transformed <- (torea_filter_clean1$Body_condition_TL^-2 - 1) / -2
+ggplot(torea_filter_clean1, aes(x = Bill_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Bill Colour", y = "Torea Body Condition", fill = "Torea Sex", title = "Torea Body Condition by Bill Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+torea_filter_clean2 <- torea_filter_clean %>%
+  filter (!is.na(Leg_Colour))
+ torea_filter_clean2$Body_condition_TL_transformed <- (torea_filter_clean2$Body_condition_TL^-2 - 1) / -2
+ggplot(torea_filter_clean2, aes(x = Leg_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Leg Colour", y = "Torea Body Condition", fill = "Torea Sex", title = "Torea Body Condition by Leg Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+torea_filter_clean3 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Colour))
+ torea_filter_clean3$Body_condition_TL_transformed <- (torea_filter_clean3$Body_condition_TL^-2 - 1) / -2
+torea_filter_clean3$Iris_Colour <- factor(torea_filter_clean3$Iris_Colour, levels = c("Brown-red", "Red", "Bright red scarlet", "Scarlet"))
+ggplot(torea_filter_clean3, aes(x = Iris_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Colour", y = "Torea Body Condition", fill = "Torea Sex", title = "Torea Body Condition by Iris Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+
+torea_filter_clean4 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck))
+ torea_filter_clean4$Body_condition_TL_transformed <- (torea_filter_clean4$Body_condition_TL^-2 - 1) / -2
+torea_filter_clean4$Iris_Fleck <- factor(torea_filter_clean4$Iris_Fleck, levels = c("Slight", "Fleck"))
+ggplot(torea_filter_clean4, aes(x = Iris_Fleck, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Fleck", y = "Torea Body Condition", fill = "Torea Sex", title = "Torea Body Condition by Iris Fleck and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+#viewing sex ~ Iris fleck as a stand alone interaction
+#use proportional ammount of sex per iris fleck size
+#clean data
+torea_filter_clean5 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck) &
+  !is.na(Full_Sex))
+torea_filter_clean5$Iris_Fleck <- factor(torea_filter_clean5$Iris_Fleck, levels = c("Slight", "Fleck"))
+
+proportions <- torea_filter_clean5 %>%
+  group_by(Iris_Fleck, Full_Sex) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(Iris_Fleck) %>%
+  mutate(proportion = count / sum(count))
+
+total_n <- sum(proportions$count)
+
+
+ggplot(proportions, aes(x = Iris_Fleck, y = proportion, fill = Full_Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  annotate("text", x = 1, y = 1, label = paste("n =", total_n), 
+           hjust = 2, vjust = 1, size = 5, color = "black") +
+  labs(x = "Iris Fleck Size", y = "Proportion of Sex", fill = "Sex", title = "Proportion of Sex by Iris Fleck Size") +
+  theme_minimal()
+
+```

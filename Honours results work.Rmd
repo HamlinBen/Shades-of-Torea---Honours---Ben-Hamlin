@@ -1,0 +1,300 @@
+---
+title: "FINAL RESULTS ATTEMPT"
+author: "Ben Hamlin"
+date: "2024-05-27"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+Import Data and librarys
+---
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+```
+
+---
+Data import 
+---
+```{r}
+#import datasets in this project
+# Reading Morphological Data into R, specific file path required due to computer specific storage.
+morph_traits <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "MorphometricAdultSIPO2020-23-Mal.xlsx"))
+#removing null time data from date of collection
+morph_traits$Date <- as.Date(morph_traits$Date)
+morph_traits$Date <- format(morph_traits$Date, "%Y-%m")
+#reading DNA sex into R.
+sex_inf <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SexingData-Mal.xlsx"))
+#Produced one null line resulting in N/A results, removed from data frame.
+sex<- sex_inf[-143,]
+#removing null time data from date of collection
+sex$Date <- as.Date(sex$Date)
+sex$Date <- format(sex$Date, "%Y-%m")
+#Checking data for any immediate issues
+str(morph_traits)
+str(sex)
+```
+
+```{R}
+#Join both datasets by common columns using full join.
+# This will be our full dataset on which statistical analysis will be done
+# sex has 142 rows, morph_traits has 95, baseline_data shows 58 (52 from basline_data + 4 X or No samples) are common across both, expect (142+95-58) 179 rows in this dataset.
+#"xy" duplication occurs.
+Torea_data <- full_join(sex,morph_traits,by = "Band_Number")
+#combine flag colours
+Torea_data <- Torea_data %>%
+  mutate(Flag_Colour = ifelse(is.na(Flag_Colour.x),Flag_Colour.y,Flag_Colour.x))
+#combine GPS tag ID
+Torea_data <- Torea_data %>%
+  mutate(GPS_Tag_ID = ifelse(is.na(GPS_Tag_ID.x),GPS_Tag_ID.y,GPS_Tag_ID.x))
+#Combine Flag Code
+Torea_data <- Torea_data %>%
+  mutate(Flag_Code = ifelse(is.na(Flag_Code.x),Flag_Code.y,Flag_Code.x))
+#combine Easting (morphometric data (y) as primary)
+Torea_data <- Torea_data %>%
+  mutate(Easting = ifelse(is.na(Easting.y),Easting.x,Easting.y))
+#combine northing (morphometric (y) as primary)
+Torea_data <- Torea_data %>%
+  mutate(Northing = ifelse(is.na(Northing.y),Northing.x,Northing.y))
+#combine dates- as.date to stop scintific notation format
+Torea_data <- Torea_data %>%
+  mutate(Date = ifelse(is.na(Date.x),Date.y,Date.x))
+#remove x-y repeats
+Torea_data <- Torea_data %>%
+  select(-Date.x, -Date.y, -Northing.x, -Northing.y, -Easting.x, -Easting.y, -Flag_Code.x, -Flag_Code.y, -Flag_Colour.x, -Flag_Colour.y, -GPS_Tag_ID.x, -GPS_Tag_ID.y)
+
+str(Torea_data)
+```
+
+
+```{r}
+# discrimnant function key points
+# coefficients.
+a1 <- 0.46
+a2 <- 3.15
+a3 <- 2.94
+
+# discriminant point
+discriminant_point <- 77.41
+```
+
+```{r}
+#applying discriminant function to basline data
+# Apply the discriminant function and create a new column
+baseline_data <- baseline_data %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M")
+  )
+
+# Print the modified dataset
+print(baseline_data[,c("Band_Number", "DNA_sex", "Bakers_sex")])
+
+# Calculate the number of matches and non-matches
+comparison_table <- table(DNA_sex = baseline_data$DNA_sex, Bakers_sex = baseline_data$Bakers_sex)
+
+# Print the comparison table
+print(comparison_table)
+
+# Calculate the number of matches and non-matches
+num_matches <- sum(baseline_data$DNA_sex == baseline_data$Bakers_sex)
+num_non_matches <- sum(baseline_data$DNA_sex != baseline_data$Bakers_sex)
+accuracy_baseline <-  sum((num_matches / (num_matches+num_non_matches) * 100))
+accuracy_baseline_per <- sprintf("%.2f%%", accuracy_baseline)
+
+# Print the numbers of matches and non-matches
+print(paste("Number of matches:", num_matches))
+print(paste("Number of non-matches:", num_non_matches))
+print(paste("Bakers Equation Basline Accuracy:", accuracy_baseline_per))
+```
+`
+
+```{R}
+# This will be our known base set for accurate results as only including birds which the sex is known.
+
+baseline_data_org <- merge(morph_traits, sex, by = "Band_Number")
+
+#Filter so only known sex samples are present
+baseline_data <- baseline_data_org %>%
+  filter(DNA_sex !="X" & DNA_sex !="NO SAMPLE")
+
+#combine flag colours
+baseline_data <- baseline_data %>%
+  mutate(Flag_Colour = ifelse(is.na(Flag_Colour.x),Flag_Colour.y,Flag_Colour.x))
+#combine GPS tag ID
+baseline_data <- baseline_data %>%
+  mutate(GPS_Tag_ID = ifelse(is.na(GPS_Tag_ID.x),GPS_Tag_ID.y,GPS_Tag_ID.x))
+#Combine Flag Code
+baseline_data <- baseline_data %>%
+  mutate(Flag_Code = ifelse(is.na(Flag_Code.x),Flag_Code.y,Flag_Code.x))
+#combine Easting (morphometric data (y) as primary)
+baseline_data <- baseline_data %>%
+  mutate(Easting = ifelse(is.na(Easting.y),Easting.x,Easting.y))
+#combine northing (morphometric (y) as primary)
+baseline_data <- baseline_data %>%
+  mutate(Northing = ifelse(is.na(Northing.y),Northing.x,Northing.y))
+#combine dates- as.date to stop scintific notation format
+baseline_data <- baseline_data %>%
+  mutate(Date = ifelse(is.na(Date.x),Date.y,Date.x))
+#remove x-y repeats
+baseline_data <- baseline_data %>%
+  select(-Date.x, -Date.y, -Northing.x, -Northing.y, -Easting.x, -Easting.y, -Flag_Code.x, -Flag_Code.y, -Flag_Colour.x, -Flag_Colour.y, -GPS_Tag_ID.x, -GPS_Tag_ID.y)
+
+
+
+print(baseline_data)
+str(baseline_data)
+```
+
+
+
+
+
+```{r}
+#Bakers equation, full dataset
+#First run through only using Bakers equation sex results, then we will modify data using DNA sex results as the reliable result
+
+# Apply the discriminant function and create a new column
+Torea_data <- Torea_data %>%
+  mutate(
+    discriminant_score = (a1 * Bill_Length) + (a2 * (Bill_Length / Bill_Depth)) + (a3 * (Bill_Length / Bill_Width)),
+    Bakers_sex = ifelse(discriminant_score > discriminant_point, "F", "M")
+  )
+
+# Print the modified dataset
+print(Torea_data[,c("Band_Number", "DNA_sex", "Bakers_sex")])
+#print datapoints that are NA to confirm rational for NA result
+print(Torea_data[is.na(Torea_data$Bakers_sex), c("Band_Number", "Bakers_sex", "DNA_sex", "Bill_Length", "Bill_Depth", "Bill_Width")])
+
+Torea_data <- Torea_data %>%
+      mutate(Full_Sex = if_else(is.na(DNA_sex) | DNA_sex %in% c("NO SAMPLE", "X"), Bakers_sex, DNA_sex)
+)
+print(Torea_data)
+#No calculation of Bakers equation accuracy as sex is not known only modeled. 
+# add body weight calculations 
+Torea_data <- Torea_data %>%
+  mutate(Body_condition_TL = Torea_data$Weight/Torea_data$Tarsus_Length, 
+         Body_condition_WL = Torea_data$Weight/Torea_data$Wing_Length, 
+         Body_condition_BL = Torea_data$Weight/Torea_data$Bill_Length
+         )
+#graph visualisation of Body condition data
+Torea_data_BC1_view <- Torea_data %>%
+  mutate(across(c(Body_condition_TL, Body_condition_WL, Body_condition_BL)))
+BC1_vis_data <- Torea_data_BC1_view %>%
+  pivot_longer(cols = c(Body_condition_TL, Body_condition_WL, Body_condition_BL),
+               names_to = "Condition_method", values_to = "BC_Value")
+                
+ggplot(BC1_vis_data, aes(x = BC_Value, fill = Condition_method)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Comparison of Body Condition Calculations",
+       x = "Body Condition Value",
+       y = "Density",
+       fill = "BC assessment method") +
+  scale_fill_manual(values = c("red","green","blue"),
+  labels = c("Tarsus Length", "Wing Length", "Bill Length"))+
+  theme_minimal()
+print(Torea_data)
+```
+
+```{r}
+#To view the Body condition data as equal they are set to the same 0 median and 1SD
+Torea_data_BC_view <- Torea_data %>%
+  mutate(
+ TL_std = (Body_condition_TL - mean(Body_condition_TL, na.rm = TRUE)) / sd(Body_condition_TL, na.rm = TRUE),
+    WL_std = (Body_condition_WL - mean(Body_condition_WL, na.rm = TRUE)) / sd(Body_condition_WL, na.rm = TRUE),
+    BL_std = (Body_condition_BL - mean(Body_condition_BL, na.rm = TRUE)) / sd(Body_condition_BL, na.rm = TRUE))
+
+
+
+
+#reshaping data for easier manipulation
+Torea_data_BC_view <- Torea_data_BC_view %>%
+  pivot_longer(cols = c(Body_condition_TL, Body_condition_WL, Body_condition_BL),
+               names_to = "Body_condition_Type", values_to = "Body_condition_Value")
+
+BC_vis_data <- Torea_data_BC_view %>%
+  pivot_longer(cols = c(TL_std, WL_std, BL_std),
+               names_to = "Condition_method", values_to = "BC_Value")
+
+#visual representation of body condition scores
+#visualised both with and without sex faceting
+ggplot(BC_vis_data, aes(x = BC_Value, fill = Condition_method)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Comparison of Standardized Body Condition Calculations",
+       x = "Standardized Body Condition Value",
+       y = "Density",
+       fill = "BC assessment method") +
+  scale_fill_manual(values = c("red","green","blue"),
+  labels = c("Tarsus Length", "Wing Length", "Bill Length"))+
+  theme_minimal()
+
+#removing NA values to allow faceting  
+BC_vis_data <- BC_vis_data %>%
+    filter(!is.na(Full_Sex))
+  
+ggplot(BC_vis_data, aes(x = BC_Value, fill = Condition_method)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Comparison of Standardized Body Condition Calculations",
+       x = "Standardized Body Condition Value",
+       y = "Density",
+       fill = "BC assessment method") +
+  scale_fill_manual(values = c("red","green","blue"),labels = c("Tarsus Length", "Wing Length", "Bill Length"))+
+  theme_minimal()+
+  facet_wrap(~Full_Sex, drop = TRUE)
+
+#check sexual dimorphism of Body condition.
+t_test_TL_sex <- t.test(Body_condition_TL ~ Full_Sex, data = Torea_data)
+t_test_WL_sex <- t.test(Body_condition_WL ~ Full_Sex, data = Torea_data)
+t_test_BL_sex <- t.test(Body_condition_BL ~ Full_Sex, data = Torea_data)
+
+# View results
+print(t_test_TL_sex)
+print(t_test_WL_sex)
+print(t_test_BL_sex)
+
+
+print(Torea_data_BC_view)
+#add BC 
+```
+
+```{r}
+#To view the Body condition data as equal they are set to the same 0 median and 1SD
+Torea_data_BC_cor <- Torea_data %>%
+  mutate(
+ TL_std = (Body_condition_TL - mean(Body_condition_TL, na.rm = TRUE)) / sd(Body_condition_TL, na.rm = TRUE),
+    WL_std = (Body_condition_WL - mean(Body_condition_WL, na.rm = TRUE)) / sd(Body_condition_WL, na.rm = TRUE),
+    BL_std = (Body_condition_BL - mean(Body_condition_BL, na.rm = TRUE)) / sd(Body_condition_BL, na.rm = TRUE))
+
+#R2
+pearson_corr_TW <- cor(Torea_data_BC_cor$TL_std, Torea_data_BC_cor$WL_std, method = "pearson", use = "complete.obs")
+pearson_corr_TB <- cor(Torea_data_BC_cor$TL_std, Torea_data_BC_cor$BL_std, method = "pearson", use = "complete.obs")
+pearson_corr_WB <- cor(Torea_data_BC_cor$WL_std, Torea_data_BC_cor$BL_std, method = "pearson", use = "complete.obs")
+
+R_squared <- c(pearson_corr_TW^2, pearson_corr_TB^2, pearson_corr_WB^2)
+names(R_squared) <- c("Tarsus vs Wing", "Tarsus vs Bill", "Wing vs Bill")
+
+print("R-squared values:")
+print(R_squared)
+
+# significance
+pearson_test1 <- cor.test(Torea_data_BC_cor$TL_std, Torea_data_BC_cor$WL_std, method = "pearson", use = "complete.obs")
+pearson_test2 <- cor.test(Torea_data_BC_cor$TL_std, Torea_data_BC_cor$BL_std, method = "pearson", use = "complete.obs")
+pearson_test3 <- cor.test(Torea_data_BC_cor$WL_std, Torea_data_BC_cor$BL_std, method = "pearson", use = "complete.obs")
+
+# Print p-values for significance testing
+cat("P-values for Pearson Correlation:\n")
+cat("Tarsus vs Wing: ", pearson_test1$p.value, "\n")
+cat("Tarsus vs Bill: ", pearson_test2$p.value, "\n")
+cat("Wing vs Bill: ", pearson_test3$p.value, "\n")
+```
+
+

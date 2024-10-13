@@ -1,0 +1,68 @@
+---
+title: "DFA"
+author: "Ben Hamlin"
+date: "2024-09-04"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+library(MASS)
+```
+
+```{r}
+#import
+torea_data_DFA <- baseline_data[, !(names(baseline_data) %in% c("Bander", "Nest","Bill_Shape","Bill_Colour", "Leg_Colour", "Iris_Colour","Iris_Fleck","Sample_ID", "Location","Flag_Colour","GPS_Tag_ID","Flag_Code","Easting", "Northing","Date", "Band_Number"))]
+torea_data_DFA <- na.omit(torea_data_DFA)
+str(torea_data_DFA)
+```
+
+```{r}
+#linear analysis 
+torea_lda <- lda(DNA_sex ~ Bill_Length + Weight + Wing_Length + Tarsus_Length, data = torea_data_DFA)
+
+print(torea_lda)
+```
+
+```{r}
+#validation of expanded function
+
+lda_use <- predict(torea_lda,torea_data_DFA)
+
+torea_data_DFA$new_DF <- lda_use$class
+
+print(torea_data_DFA)
+```
+
+```{r}
+table(Predicted = torea_data_DFA$new_DF, Actual = torea_data_DFA$DNA_sex)
+```
+```{r}
+#data setup
+torea_data_DFA$DNA_sex <- as.factor(torea_data_DFA$DNA_sex)
+
+#initial model
+torea_lda_1<- lda(DNA_sex ~ ., data = torea_data_DFA)
+torea_glm<- glm(DNA_sex ~ ., data = torea_data_DFA, family = binomial)
+
+stepdisc_torea <- stepAIC(torea_glm, direction = "both")
+summary(stepdisc_torea)
+```
+
+```
+
+
+
+

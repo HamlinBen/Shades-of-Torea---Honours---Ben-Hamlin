@@ -1,0 +1,2086 @@
+---
+title: "Filtered honours results"
+author: "Ben Hamlin"
+date: "2024-09-11"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+library(s20x)
+library(car)
+library(ResourceSelection)
+library(caret)
+library(pROC)
+library(nlme)
+library(MASS)
+library(lmtest)
+library(emmeans)
+```
+
+```{r}
+#import
+torea_data_berd <- torea_data_cor
+
+#age data
+age <- read_excel(path = file.path("C:", "University of Otago", "Honours", "Honours R work", "SIPO_AgeDetails.xlsx"))
+
+
+if ("Band_Number" %in% colnames(torea_data_berd) & "Band_Number" %in% colnames(age)) {
+  aged_torea_data <- full_join(torea_data_berd, age, by = "Band_Number")
+}
+
+print(aged_torea_data)
+str(aged_torea_data)
+
+#remove fledglings
+aged_torea_filter <- aged_torea_data %>%
+  filter(Age != 'Fledgling')
+
+print(aged_torea_filter)
+str(aged_torea_filter)
+
+
+#return data to original name so works throughout
+torea_data_berd <- aged_torea_filter
+```
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_data_berd$DNA_sex <- ifelse(torea_data_berd$DNA_sex %in% c("NO SAMPLE", "X"), "NO SAMPLE", torea_data_berd$DNA_sex)
+torea_data_berd$DNA_sex[is.na(torea_data_berd$DNA_sex)] <- "NO SAMPLE"
+#allows for known sex to always appear on top
+torea_data_berd$alpha <- ifelse(torea_data_berd$DNA_sex %in% c("M", "F"), 1, 0.7)
+
+#Combine slight and no fleck into one factor
+torea_data_berd$Iris_Fleck <- ifelse(torea_data_berd$Iris_Fleck %in% c("Slight", "None"), "Slight", torea_data_berd$Iris_Fleck)
+
+#combine brown-orange and re into brown-red
+torea_data_berd$Iris_Colour <- ifelse(torea_data_berd$Iris_Colour %in% c("Brown-orange", "Red-orange", "Red"), "Brown-red", torea_data_berd$Iris_Colour)
+
+#check data import 
+str(torea_data_berd)
+table(torea_data_berd$DNA_sex)
+table(torea_data_berd$Iris_Fleck)
+table(torea_data_berd$Iris_Colour)
+```
+
+```{r}
+#remove bakers function range to create clusters and remove overlap
+#range
+
+min_value <- 72.41
+max_value <- 82.41
+
+#remove all NO SAMPLE data within this range
+torea_filtered_berd <- torea_data_berd %>%
+  filter(
+    !(torea_data_berd$discriminant_score >= min_value & torea_data_berd$discriminant_score <= max_value & torea_data_berd$DNA_sex == 'NO SAMPLE') 
+  )
+
+print (torea_filtered_berd)
+table(torea_filtered_berd$DNA_sex)
+table(torea_filtered_berd$Full_Sex)
+table(torea_filtered_berd$Bill_Colour)
+table(torea_filtered_berd$Leg_Colour)
+table(torea_filtered_berd$Iris_Colour)
+table(torea_filtered_berd$Iris_Fleck)
+```
+
+```{r}
+#viewing discriminant score compared to traits - continuous
+
+# discriminant score vs torea weight by sex
+corr_test_dsw <- cor.test(torea_filtered_berd$Weight, torea_filtered_berd$discriminant_score)
+corr_coeff_dsw <- round(corr_test_dsw$estimate, 2)
+p_value_dsw <- corr_test_dsw$p.value
+p_value_text_dsw <- format.pval(p_value_dsw)
+
+ggplot(torea_filtered_berd, aes(x = Weight, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Weight (g)", y = "Discriminant Score", color = "Sex", title = "Torea Weight vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsw, "P-value:", p_value_text_dsw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea bill length by sex
+corr_test_dsbl <- cor.test(torea_filtered_berd$Bill_Length, torea_filtered_berd$discriminant_score)
+corr_coeff_dsbl <- round(corr_test_dsbl$estimate, 2)
+p_value_dsbl <- corr_test_dsbl$p.value
+p_value_text_dsbl <- format.pval(p_value_dsbl)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbl, "P-value:", p_value_text_dsbl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+num_points <- nrow(torea_filtered_berd)
+print(num_points)
+
+
+# discriminant score vs torea bill depth by sex
+corr_test_dsbd <- cor.test(torea_filtered_berd$Bill_Depth, torea_filtered_berd$discriminant_score)
+corr_coeff_dsbd <- round(corr_test_dsbd$estimate, 2)
+p_value_dsbd <- corr_test_dsbd$p.value
+p_value_text_dsbd <- format.pval(p_value_dsbd)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Depth, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Depth (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill Depth vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbd, "P-value:", p_value_text_dsbd),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea bill Width by sex
+corr_test_dsbw <- cor.test(torea_filtered_berd$Bill_Width, torea_filtered_berd$discriminant_score)
+corr_coeff_dsbw <- round(corr_test_dsbw$estimate, 2)
+p_value_dsbw <- corr_test_dsbw$p.value
+p_value_text_dsbw <- format.pval(p_value_dsbw)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Width, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Width (mm)", y = "Discriminant Score", color = "Sex", title = "Torea Bill Width vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbw, "P-value:", p_value_text_dsbw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea Wing length by sex
+corr_test_dswl <- cor.test(torea_filtered_berd$Wing_Length, torea_filtered_berd$discriminant_score)
+corr_coeff_dswl <- round(corr_test_dswl$estimate, 2)
+p_value_dswl <- corr_test_dswl$p.value
+p_value_text_dswl <- format.pval(p_value_dswl)
+
+ggplot(torea_filtered_berd, aes(x = Wing_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Wing Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea wing length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dswl, "P-value:", p_value_text_dswl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea Tarsus length by sex
+corr_test_dstl <- cor.test(torea_filtered_berd$Tarsus_Length, torea_filtered_berd$discriminant_score)
+corr_coeff_dstl <- round(corr_test_dstl$estimate, 2)
+p_value_dstl <- corr_test_dstl$p.value
+p_value_text_dstl <- format.pval(p_value_dstl)
+
+ggplot(torea_filtered_berd, aes(x = Tarsus_Length, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Tarsus Length (mm)", y = "Discriminant Score", color = "Sex", title = "Torea tarsus length vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dstl, "P-value:", p_value_text_dstl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs torea body condition by sex
+corr_test_dsbc <- cor.test(torea_filtered_berd$Body_condition_TL, torea_filtered_berd$discriminant_score)
+corr_coeff_dsbc <- round(corr_test_dsbc$estimate, 2)
+p_value_dsbc <- corr_test_dsbc$p.value
+p_value_text_dsbc <- format.pval(p_value_dsbc)
+
+ggplot(torea_filtered_berd, aes(x = Body_condition_TL, y = discriminant_score)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Body Condition", y = "Discriminant Score", color = "Sex", title = "Torea body condition vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_dsbc, "P-value:", p_value_text_dsbc),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# assessing body condition compared to categorical variables
+
+# discriminant score vs bill colour by sex
+torea_filtered_berd_vis1 <- torea_filtered_berd %>%
+  filter(!is.na(Bill_Colour))
+torea_filtered_berd_vis1$Bill_Colour <- as.factor(torea_filtered_berd_vis1$Bill_Colour)
+
+anova_dsbc <- aov(discriminant_score ~ Bill_Colour, data = torea_filtered_berd_vis1)
+anova_sum_dsbc <- summary(anova_dsbc)[[1]]
+p_value_dsbc <- anova_sum_dsbc["Bill_Colour", "Pr(>F)"]
+f_value_dsbc <- anova_sum_dsbc["Bill_Colour", "F value"]
+anova_text_dsbc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsbc, 2), "\n",
+  "p-value = ", format.pval(p_value_dsbc)
+)
+
+ggplot(torea_filtered_berd_vis1, aes(x = Bill_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Colour", y = "Discriminant Score", color = "Sex", title = "Torea bill colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsbc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs leg colour by sex
+torea_filtered_berd_vis2 <- torea_filtered_berd %>%
+  filter(!is.na(Leg_Colour))
+torea_filtered_berd_vis2$Leg_Colour <- as.factor(torea_filtered_berd_vis2$Leg_Colour)
+
+anova_dslc <- aov(discriminant_score ~ Leg_Colour, data = torea_filtered_berd_vis2)
+anova_sum_dslc <- summary(anova_dslc)[[1]]
+p_value_dslc <- anova_sum_dslc["Leg_Colour", "Pr(>F)"]
+f_value_dslc <- anova_sum_dslc["Leg_Colour", "F value"]
+anova_text_dslc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dslc, 2), "\n",
+  "p-value = ", format.pval(p_value_dslc)
+)
+
+ggplot(torea_filtered_berd_vis2, aes(x = Leg_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Leg Colour", y = "Discriminant Score", color = "Sex", title = "Torea leg colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dslc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs Iris colour by sex
+torea_filtered_berd_vis3 <- torea_filtered_berd %>%
+  filter(!is.na(Iris_Colour))
+torea_filtered_berd_vis3$Iris_Colour <- as.factor(torea_filtered_berd_vis3$Iris_Colour)
+
+anova_dsic <- aov(discriminant_score ~ Iris_Colour, data = torea_filtered_berd_vis3)
+anova_sum_dsic <- summary(anova_dsic)[[1]]
+p_value_dsic <- anova_sum_dsic["Iris_Colour", "Pr(>F)"]
+f_value_dsic <- anova_sum_dsic["Iris_Colour", "F value"]
+anova_text_dsic <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsic, 2), "\n",
+  "p-value = ", format.pval(p_value_dsic)
+)
+
+ggplot(torea_filtered_berd_vis3, aes(x = Iris_Colour, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Colour", y = "Discriminant Score", color = "Sex", title = "Torea iris colour vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsic,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# discriminant score vs iris fleck by sex
+torea_filtered_berd_vis4 <- torea_filtered_berd %>%
+  filter(!is.na(Iris_Fleck))
+torea_filtered_berd_vis4$Iris_Fleck <- as.factor(torea_filtered_berd_vis4$Iris_Fleck)
+
+anova_dsif <- aov(discriminant_score ~ Iris_Fleck, data = torea_filtered_berd_vis4)
+anova_sum_dsif <- summary(anova_dsif)[[1]]
+p_value_dsif <- anova_sum_dsif["Iris_Fleck", "Pr(>F)"]
+f_value_dsif <- anova_sum_dsif["Iris_Fleck", "F value"]
+anova_text_dsif <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_dsif, 2), "\n",
+  "p-value = ", format.pval(p_value_dsif)
+)
+
+ggplot(torea_filtered_berd_vis4, aes(x = Iris_Fleck, y = discriminant_score)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  geom_hline(yintercept = 77.41, linetype = "dashed", color = "green") +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Fleck", y = "Discriminant Score", color = "Sex", title = "Torea iris fleck vs discriminant score") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_dsif,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+
+```{r}
+#viewing weight compared to traits - continuous
+
+# weight vs torea bill length by sex
+corr_test_wbl <- cor.test(torea_filtered_berd$Bill_Length, torea_filtered_berd$Weight)
+corr_coeff_wbl <- round(corr_test_wbl$estimate, 2)
+p_value_wbl <- corr_test_wbl$p.value
+p_value_text_wbl <- format.pval(p_value_wbl)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Length, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Length (mm)", y = "Torea Weight (g)", color = "Sex", title = "Torea Bill Length vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wbl, "P-value:", p_value_text_wbl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# weight vs torea bill depth by sex
+corr_test_wbd <- cor.test(torea_filtered_berd$Bill_Depth, torea_filtered_berd$Weight)
+corr_coeff_wbd <- round(corr_test_wbd$estimate, 2)
+p_value_wbd <- corr_test_wbd$p.value
+p_value_text_wbd <- format.pval(p_value_wbd)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Depth, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Depth (mm)", y = "Torea Weight (g)", color = "Sex", title = "Torea Bill Depth vs weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wbd, "P-value:", p_value_text_wbd),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# weight vs torea bill Width by sex
+corr_test_wbw <- cor.test(torea_filtered_berd$Bill_Width, torea_filtered_berd$Weight)
+corr_coeff_wbw <- round(corr_test_wbw$estimate, 2)
+p_value_wbw <- corr_test_wbw$p.value
+p_value_text_wbw <- format.pval(p_value_wbw)
+
+ggplot(torea_filtered_berd, aes(x = Bill_Width, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Width (mm)", y = "Weight", color = "Sex", title = "Torea Bill Width vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wbw, "P-value:", p_value_text_wbw),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs torea Wing length by sex
+corr_test_wwl <- cor.test(torea_filtered_berd$Wing_Length, torea_filtered_berd$Weight)
+corr_coeff_wwl <- round(corr_test_wwl$estimate, 2)
+p_value_wwl <- corr_test_wwl$p.value
+p_value_text_wwl <- format.pval(p_value_wwl)
+
+ggplot(torea_filtered_berd, aes(x = Wing_Length, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Wing Length (mm)", y = "Weight", color = "Sex", title = "Torea wing length vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wwl, "P-value:", p_value_text_wwl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs torea Tarsus length by sex
+corr_test_wtl <- cor.test(torea_filtered_berd$Tarsus_Length, torea_filtered_berd$Weight)
+corr_coeff_wtl <- round(corr_test_wtl$estimate, 2)
+p_value_wtl <- corr_test_wtl$p.value
+p_value_text_wtl <- format.pval(p_value_wtl)
+
+ggplot(torea_filtered_berd, aes(x = Tarsus_Length, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Tarsus Length (mm)", y = "Weight", color = "Sex", title = "Torea tarsus length vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wtl, "P-value:", p_value_text_wtl),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs torea body condition by sex
+corr_test_wbc <- cor.test(torea_filtered_berd$Body_condition_TL, torea_filtered_berd$Weight)
+corr_coeff_wbc <- round(corr_test_wbc$estimate, 2)
+p_value_wbc <- corr_test_wbc$p.value
+p_value_text_wbc <- format.pval(p_value_wbc)
+
+ggplot(torea_filtered_berd, aes(x = Body_condition_TL, y = Weight)) +
+  geom_point(aes(color = DNA_sex,
+             alpha = alpha),
+size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Body Condition", y = "Weight", color = "Sex", title = "Torea body condition vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = paste("Correlation:", corr_coeff_wbc, "P-value:", p_value_text_wbc),
+    hjust = 1.1, vjust = 22, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# assessing body condition compared to categorical variables
+
+# Weight vs bill colour by sex
+torea_filtered_berd_vis1 <- torea_filtered_berd %>%
+  filter(!is.na(Bill_Colour))
+torea_filtered_berd_vis1$Bill_Colour <- as.factor(torea_filtered_berd_vis1$Bill_Colour)
+
+anova_wbc <- aov(Weight ~ Bill_Colour, data = torea_filtered_berd_vis1)
+anova_sum_wbc <- summary(anova_wbc)[[1]]
+p_value_wbc <- anova_sum_wbc["Bill_Colour", "Pr(>F)"]
+f_value_wbc <- anova_sum_wbc["Bill_Colour", "F value"]
+anova_text_wbc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_wbc, 2), "\n",
+  "p-value = ", format.pval(p_value_wbc)
+)
+
+ggplot(torea_filtered_berd_vis1, aes(x = Bill_Colour, y = Weight)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Colour", y = "Weight", color = "Sex", title = "Torea bill colour vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_wbc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs leg colour by sex
+torea_filtered_berd_vis2 <- torea_filtered_berd %>%
+  filter(!is.na(Leg_Colour))
+torea_filtered_berd_vis2$Leg_Colour <- as.factor(torea_filtered_berd_vis2$Leg_Colour)
+
+anova_wlc <- aov(Weight ~ Leg_Colour, data = torea_filtered_berd_vis2)
+anova_sum_wlc <- summary(anova_wlc)[[1]]
+p_value_wlc <- anova_sum_wlc["Leg_Colour", "Pr(>F)"]
+f_value_wlc <- anova_sum_wlc["Leg_Colour", "F value"]
+anova_text_wlc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_wlc, 2), "\n",
+  "p-value = ", format.pval(p_value_wlc)
+)
+
+ggplot(torea_filtered_berd_vis2, aes(x = Leg_Colour, y = Weight)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Leg Colour", y = "Weight", color = "Sex", title = "Torea leg colour vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_wlc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs Iris colour by sex
+torea_filtered_berd_vis3 <- torea_filtered_berd %>%
+  filter(!is.na(Iris_Colour))
+torea_filtered_berd_vis3$Iris_Colour <- as.factor(torea_filtered_berd_vis3$Iris_Colour)
+
+anova_wic <- aov(Weight ~ Iris_Colour, data = torea_filtered_berd_vis3)
+anova_sum_wic <- summary(anova_wic)[[1]]
+p_value_wic <- anova_sum_wic["Iris_Colour", "Pr(>F)"]
+f_value_wic <- anova_sum_wic["Iris_Colour", "F value"]
+anova_text_wic <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_wic, 2), "\n",
+  "p-value = ", format.pval(p_value_wic)
+)
+
+ggplot(torea_filtered_berd_vis3, aes(x = Iris_Colour, y = Weight)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Colour", y = "Weight", color = "Sex", title = "Torea iris colour vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_wic,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Weight vs iris fleck by sex
+torea_filtered_berd_vis4 <- torea_filtered_berd %>%
+  filter(!is.na(Iris_Fleck))
+torea_filtered_berd_vis4$Iris_Fleck <- as.factor(torea_filtered_berd_vis4$Iris_Fleck)
+
+anova_wif <- aov(Weight ~ Iris_Fleck, data = torea_filtered_berd_vis4)
+anova_sum_wif <- summary(anova_wif)[[1]]
+p_value_wif <- anova_sum_wif["Iris_Fleck", "Pr(>F)"]
+f_value_wif <- anova_sum_wif["Iris_Fleck", "F value"]
+anova_text_wif <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_wif, 2), "\n",
+  "p-value = ", format.pval(p_value_wif)
+)
+
+ggplot(torea_filtered_berd_vis4, aes(x = Iris_Fleck, y = Weight)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Fleck", y = "Weight", color = "Sex", title = "Torea iris fleck vs Weight") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_wif,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_filter_clean <- torea_filtered_berd %>% 
+  filter(!is.na(Full_Sex))
+torea_filter_clean <- torea_filter_clean %>%
+  mutate(Iris_Fleck = dplyr::recode(Iris_Fleck, "Slight" = "None + Slight"))
+torea_filter_clean$Full_Sex <- as.factor(torea_filter_clean$Full_Sex)
+as.factor(torea_filter_clean$DNA_sex)
+str(torea_filter_clean)
+
+
+#determining n
+num_individuals <- length(unique(torea_filter_clean$Band_Number))
+
+cat("Number of unique individuals in the analysis:", num_individuals, "\n")
+```
+
+```{r}
+#morphological data  
+torea_filter_clean %>%
+  group_by(Full_Sex) %>%
+  summarise(
+    n = n(),
+
+    mean_weight = mean(Weight, na.rm = TRUE),
+    sd_weight = sd(Weight, na.rm = TRUE),
+    min_weight = min(Weight, na.rm = TRUE),
+    q1_weight = quantile(Weight, 0.25, na.rm = TRUE),
+    median_weight = median(Weight, na.rm = TRUE),
+    q3_weight = quantile(Weight, 0.75, na.rm = TRUE),
+    max_weight = max(Weight, na.rm = TRUE),
+
+    mean_bill_length = mean(Bill_Length, na.rm = TRUE),
+    sd_bill_length = sd(Bill_Length, na.rm = TRUE),
+    min_bill_length = min(Bill_Length, na.rm = TRUE),
+    q1_bill_length = quantile(Bill_Length, 0.25, na.rm = TRUE),
+    median_bill_length = median(Bill_Length, na.rm = TRUE),
+    q3_bill_length = quantile(Bill_Length, 0.75, na.rm = TRUE),
+    max_bill_length = max(Bill_Length, na.rm = TRUE),
+
+    mean_bill_width = mean(Bill_Width, na.rm = TRUE),
+    sd_bill_width = sd(Bill_Width, na.rm = TRUE),
+    min_bill_width = min(Bill_Width, na.rm = TRUE),
+    q1_bill_width = quantile(Bill_Width, 0.25, na.rm = TRUE),
+    median_bill_width = median(Bill_Width, na.rm = TRUE),
+    q3_bill_width = quantile(Bill_Width, 0.75, na.rm = TRUE),
+    max_bill_width = max(Bill_Width, na.rm = TRUE),
+
+    mean_bill_depth = mean(Bill_Depth, na.rm = TRUE),
+    sd_bill_depth = sd(Bill_Depth, na.rm = TRUE),
+    min_bill_depth = min(Bill_Depth, na.rm = TRUE),
+    q1_bill_depth = quantile(Bill_Depth, 0.25, na.rm = TRUE),
+    median_bill_depth = median(Bill_Depth, na.rm = TRUE),
+    q3_bill_depth = quantile(Bill_Depth, 0.75, na.rm = TRUE),
+    max_bill_depth = max(Bill_Depth, na.rm = TRUE),
+
+    mean_tarsus_length = mean(Tarsus_Length, na.rm = TRUE),
+    sd_tarsus_length = sd(Tarsus_Length, na.rm = TRUE),
+    min_tarsus_length = min(Tarsus_Length, na.rm = TRUE),
+    q1_tarsus_length = quantile(Tarsus_Length, 0.25, na.rm = TRUE),
+    median_tarsus_length = median(Tarsus_Length, na.rm = TRUE),
+    q3_tarsus_length = quantile(Tarsus_Length, 0.75, na.rm = TRUE),
+    max_tarsus_length = max(Tarsus_Length, na.rm = TRUE),
+
+    mean_wing_length = mean(Wing_Length, na.rm = TRUE),
+    sd_wing_length = sd(Wing_Length, na.rm = TRUE),
+    min_wing_length = min(Wing_Length, na.rm = TRUE),
+    q1_wing_length = quantile(Wing_Length, 0.25, na.rm = TRUE),
+    median_wing_length = median(Wing_Length, na.rm = TRUE),
+    q3_wing_length = quantile(Wing_Length, 0.75, na.rm = TRUE),
+    max_wing_length = max(Wing_Length, na.rm = TRUE)
+  )
+```
+
+```{r}
+#transformed data for visualisation 
+
+
+
+torea_filter_clean1 <- torea_filter_clean %>%
+  filter (!is.na(Bill_Colour))
+ggplot(torea_filter_clean1, aes(x = Bill_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Bill Colour", y = "Tōrea Body Condition", fill = "Tōrea Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+
+boxplot_data_1 <- torea_filter_clean1 %>%
+  group_by(Bill_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_1)
+
+
+torea_filter_clean2 <- torea_filter_clean %>%
+  filter (!is.na(Leg_Colour))
+ggplot(torea_filter_clean2, aes(x = Leg_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Leg Colour", y = "Tōrea Body Condition", fill = "Tōrea Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+boxplot_data_2 <- torea_filter_clean2 %>%
+  group_by(Leg_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_2)
+
+
+torea_filter_clean3 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Colour))
+torea_filter_clean3$Iris_Colour <- factor(torea_filter_clean3$Iris_Colour, levels = c("Brown-red", "Red", "Bright red scarlet", "Scarlet"))
+ggplot(torea_filter_clean3, aes(x = Iris_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Colour", y = "Tōrea Body Condition", fill = "Tōrea Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+
+boxplot_data_3 <- torea_filter_clean3 %>%
+  group_by(Iris_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_3)
+
+torea_filter_clean4 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck))
+torea_filter_clean4$Iris_Fleck <- factor(torea_filter_clean4$Iris_Fleck, levels = c("None + Slight", "Fleck"))
+ggplot(torea_filter_clean4, aes(x = Iris_Fleck, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Fleck", y = "Tōrea Body Condition", fill = "Tōrea Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+boxplot_data_4 <- torea_filter_clean4 %>%
+  group_by(Iris_Fleck, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_4)
+
+#viewing sex ~ Iris fleck as a stand alone interaction
+#use proportional ammount of sex per iris fleck size
+#clean data
+torea_filter_clean5 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck) &
+  !is.na(Full_Sex))
+torea_filter_clean5$Iris_Fleck <- factor(torea_filter_clean5$Iris_Fleck, levels = c("None + Slight", "Fleck"))
+
+proportions <- torea_filter_clean5 %>%
+  group_by(Iris_Fleck, Full_Sex) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(Iris_Fleck) %>%
+  mutate(proportion = count / sum(count))
+
+total_n <- sum(proportions$count)
+
+
+ggplot(proportions, aes(x = Iris_Fleck, y = proportion, fill = Full_Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  annotate("text", x = 1, y = 1, label = paste("n =", total_n), 
+           hjust = 2, vjust = 0, size = 5, color = "black") +
+  labs(x = "Iris Fleck Presence", y = "Proportion of Individuals", fill = "Sex") +
+  theme_minimal()
+
+```
+put n onto bar plot
+```{r}
+#full lm for bill colour:sex ~ bC
+torea_filter_clean$Bill_Colour<- as.factor(torea_filter_clean$Bill_Colour)
+
+#clean data
+torea_filter_clean_BC1 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Bill_Colour))
+ 
+#lm
+te1i<- lm(Body_condition_TL~Full_Sex+Bill_Colour+Full_Sex*Bill_Colour, data = torea_filter_clean_BC1)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te1i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te1 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te1
+
+if (lo_te1 == 0) {
+  torea_filter_clean_BC1$Body_condition_TL_transformed <- log(torea_filter_clean_BC1$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC1$Body_condition_TL_transformed <- (torea_filter_clean_BC1$Body_condition_TL^lo_te1 - 1) / lo_te1
+}
+
+te1 <- lm(Body_condition_TL_transformed ~ Full_Sex + Bill_Colour + Full_Sex * Bill_Colour, data = torea_filter_clean_BC1)
+
+summary(te1)
+
+#assumptions test
+coef(te1)
+#fitted residuals
+plot(te1, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te1)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te1 <- residuals(te1)
+SWt_te1 <- shapiro.test(residuals_te1)
+
+#q-q with S-W
+qqnorm(residuals_te1, main = "Normal Q-Q")
+qqline(residuals_te1, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te1$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te1$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te1, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te1 <- cooks20x(te1)
+
+hip_te1 <- which(cooks_te1 > 0.4)
+if(length(hip_te1) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te1)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te1)
+
+
+
+
+#reduced model
+te1b <- lm(Body_condition_TL_transformed ~ Full_Sex + Bill_Colour, data = torea_filter_clean_BC1)
+
+summary(te1b)
+
+#assumptions test
+coef(te1b)
+#fitted residuals
+plot(te1b, which = 1)
+
+#homoscedasticity
+bp_testb <- bptest(te1b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te1b <- residuals(te1b)
+SWt_te1b <- shapiro.test(residuals_te1b)
+
+#q-q with S-W
+qqnorm(residuals_te1b, main = "Normal Q-Q")
+qqline(residuals_te1b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te1b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te1b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te1b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te1b <- cooks20x(te1b)
+
+hip_te1b <- which(cooks_te1b > 0.4)
+if(length(hip_te1b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te1b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te1b)
+```
+
+
+```{r}
+#DNA sex only lm for BC~ billcolour: sex
+torea_filter_clean$Bill_Colour<- as.factor(torea_filter_clean$Bill_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_filter_clean$DNA_sex <- ifelse(torea_filter_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_filter_clean$DNA_sex)
+str(torea_filter_clean)
+
+#clean data
+torea_filter_clean_BC2 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Bill_Colour))
+
+#confirm na is not included 
+table(torea_filter_clean_BC1$DNA_sex)
+table(torea_filter_clean_BC1$Bill_Colour)
+
+#lm
+te2i<- lm(Body_condition_TL~DNA_sex+Bill_Colour+DNA_sex*Bill_Colour, data = torea_filter_clean_BC2)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te2i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te2 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te2
+
+if (lo_te2 == 0) {
+  torea_filter_clean_BC2$Body_condition_TL_transformed <- log(torea_filter_clean_BC2$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC2$Body_condition_TL_transformed <- (torea_filter_clean_BC2$Body_condition_TL^lo_te2 - 1) / lo_te2
+}
+
+te2 <- lm(Body_condition_TL_transformed ~ DNA_sex + Bill_Colour + DNA_sex * Bill_Colour, data = torea_filter_clean_BC2)
+
+summary(te2)
+
+#assumptions test
+coef(te2)
+#fitted residuals
+plot(te2, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te2)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te2 <- residuals(te2)
+SWt_te2 <- shapiro.test(residuals_te2)
+
+#q-q with S-W
+qqnorm(residuals_te2, main = "Normal Q-Q")
+qqline(residuals_te2, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te2$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te2$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te2, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te2 <- cooks20x(te2)
+
+hip_te2 <- which(cooks_te2 > 0.4)
+if(length(hip_te2) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te2)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te2)
+
+
+
+#reduced model
+te2b <- lm(Body_condition_TL_transformed ~ DNA_sex + Bill_Colour, data = torea_filter_clean_BC2)
+
+summary(te2b)
+
+#assumptions test
+coef(te2b)
+#fitted residuals
+plot(te2b, which = 1)
+
+#homoscedasticity
+bp_testb <- bptest(te2b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te2b <- residuals(te2b)
+SWt_te2b <- shapiro.test(residuals_te2b)
+
+#q-q with S-W
+qqnorm(residuals_te2b, main = "Normal Q-Q")
+qqline(residuals_te2b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te2b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te2b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te2b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te2b <- cooks20x(te2b)
+
+hip_te2b <- which(cooks_te2b > 0.4)
+if(length(hip_te2b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te2b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te2b)
+```
+
+```{r}
+#full lm for leg colour:sex ~ bC
+torea_filter_clean$Leg_Colour<- as.factor(torea_filter_clean$Leg_Colour)
+
+#clean data
+torea_filter_clean_BC3 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Leg_Colour))
+ 
+#lm
+te3i<- lm(Body_condition_TL~Full_Sex+Leg_Colour+Full_Sex*Leg_Colour, data = torea_filter_clean_BC3)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te3i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te3 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te3
+
+if (lo_te3 == 0) {
+  torea_filter_clean_BC3$Body_condition_TL_transformed <- log(torea_filter_clean_BC3$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC3$Body_condition_TL_transformed <- (torea_filter_clean_BC3$Body_condition_TL^lo_te3 - 1) / lo_te3
+}
+
+te3 <- lm(Body_condition_TL_transformed ~ Full_Sex + Leg_Colour + Full_Sex * Leg_Colour, data = torea_filter_clean_BC3)
+
+summary(te3)
+anova(te3)
+summary2way(te3, page = "nointeraction")
+
+#assumptions test
+coef(te3)
+#fitted residuals
+plot(te3, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te3)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te3 <- residuals(te3)
+SWt_te3 <- shapiro.test(residuals_te3)
+
+#q-q with S-W
+qqnorm(residuals_te3, main = "Normal Q-Q")
+qqline(residuals_te3, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te3$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te3$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te3, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te3 <- cooks20x(te3)
+
+hip_te3 <- which(cooks_te3 > 0.4)
+if(length(hip_te3) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te3)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te3)
+
+
+
+#reduced model
+te3b <- lm(Body_condition_TL_transformed ~ Full_Sex + Leg_Colour, data = torea_filter_clean_BC3)
+
+summary(te3b)
+anova(te3b)
+summary2way(te3b, page = "nointeraction")
+
+#assumptions test
+coef(te3b)
+#fitted residuals
+plot(te3b, which = 1)
+
+#homoscedasticity
+bp_testb <- bptest(te3b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te3b <- residuals(te3b)
+SWt_te3b <- shapiro.test(residuals_te3b)
+
+#q-q with S-W
+qqnorm(residuals_te3b, main = "Normal Q-Q")
+qqline(residuals_te3b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te3b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te3b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te3b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te3b<- cooks20x(te3b)
+
+hip_te3b <- which(cooks_te3b > 0.4)
+if(length(hip_te3b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te3b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#co-linearity
+vif(te3b)
+
+
+```
+
+
+```{r}
+#DNA sex only lm for BC~ Leg colour: sex
+torea_filter_clean$Leg_Colour<- as.factor(torea_filter_clean$Leg_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_filter_clean$DNA_sex <- ifelse(torea_filter_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_filter_clean$DNA_sex)
+str(torea_filter_clean)
+
+#clean data
+torea_filter_clean_BC4 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Leg_Colour))
+
+
+#lm
+te4i<- lm(Body_condition_TL~DNA_sex+Leg_Colour+DNA_sex*Leg_Colour, data = torea_filter_clean_BC4)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te4i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te4 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te4
+
+if (lo_te4 == 0) {
+  torea_filter_clean_BC4$Body_condition_TL_transformed <- log(torea_filter_clean_BC4$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC4$Body_condition_TL_transformed <- (torea_filter_clean_BC4$Body_condition_TL^lo_te4 - 1) / lo_te4
+}
+
+te4 <- lm(Body_condition_TL_transformed ~ DNA_sex + Leg_Colour + DNA_sex * Leg_Colour, data = torea_filter_clean_BC4)
+
+summary(te4)
+anova(te4)
+
+#assumptions test
+coef(te4)
+#fitted residuals
+plot(te4, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te4)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te4 <- residuals(te4)
+SWt_te4 <- shapiro.test(residuals_te4)
+
+#q-q with S-W
+qqnorm(residuals_te4, main = "Normal Q-Q")
+qqline(residuals_te4, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te4$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te4$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te4, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te4 <- cooks.distance(te4)
+
+top_te4 <- order(cooks_te4, decreasing = TRUE)[1:3]
+top_values_te4 <- cooks_te4[top_te4]
+
+plot(cooks_te4, type = "h", main = "Cook's Distance", ylab = "Cook's Distance", xlab = "Observation number")
+abline(h = 0.4, col = "red", lty = 2)
+text(top_te4, top_values_te4, labels = top_te4, col = "black", cex = 1)
+
+hip_te4 <- which(cooks_te4 > 0.4)
+if(length(hip_te4) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te4)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+vif(te4)
+
+
+
+# reduced model
+
+te4b <- lm(Body_condition_TL_transformed ~ DNA_sex + Leg_Colour, data = torea_filter_clean_BC4)
+
+summary(te4b)
+anova(te4b)
+summary2way(te4b, page = "nointeraction")
+
+#assumptions test
+coef(te4b)
+#fitted residuals
+plot(te4b, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te4b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te4b <- residuals(te4b)
+SWt_te4b <- shapiro.test(residuals_te4b)
+
+#q-q with S-W
+qqnorm(residuals_te4b, main = "Normal Q-Q")
+qqline(residuals_te4b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te4b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te4b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te4b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te4b <- cooks.distance(te4b)
+
+top_te4b <- order(cooks_te4b, decreasing = TRUE)[1:3]
+top_values_te4b <- cooks_te4b[top_te4b]
+
+plot(cooks_te4b, type = "h", main = "Cook's Distance", ylab = "Cook's Distance", xlab = "Observation number")
+abline(h = 0.4, col = "red", lty = 2)
+text(top_te4b, top_values_te4b, labels = top_te4b, col = "black", cex = 1)
+
+hip_te4b <- which(cooks_te4b > 0.4)
+if(length(hip_te4b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te4b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+vif(te4b)
+```
+
+```{r}
+#full lm for iris colour:sex ~ bC
+torea_filter_clean$Iris_Colour<- as.factor(torea_filter_clean$Iris_Colour)
+
+#clean data
+torea_filter_clean_BC5 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Iris_Colour))
+ 
+#lm
+te5i<- lm(Body_condition_TL~Full_Sex+Iris_Colour+Full_Sex*Iris_Colour, data = torea_filter_clean_BC5)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te5i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te5 <- boxcox_result$x[which.max(boxcox_result$y)]
+print(lo_te5)
+
+if (lo_te5 == 0) {
+  torea_filter_clean_BC5$Body_condition_TL_transformed <- log(torea_filter_clean_BC5$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC5$Body_condition_TL_transformed <- (torea_filter_clean_BC5$Body_condition_TL^lo_te5 - 1) / lo_te5
+}
+
+te5 <- lm(Body_condition_TL_transformed ~ Full_Sex + Iris_Colour + Full_Sex * Iris_Colour, data = torea_filter_clean_BC5)
+
+summary(te5)
+anova(te5)
+
+#assumptions test
+coef(te5)
+#fitted residuals
+plot(te5, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te5)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te5 <- residuals(te5)
+SWt_te5 <- shapiro.test(residuals_te5)
+
+#q-q with S-W
+qqnorm(residuals_te5, main = "Normal Q-Q")
+qqline(residuals_te5, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te5$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te5$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te5, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te5 <- cooks20x(te5)
+
+hip_te5 <- which(cooks_te5 > 0.4)
+if(length(hip_te5) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te5)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te5)
+
+
+#reduced model
+te5b <- lm(Body_condition_TL_transformed ~ Full_Sex + Iris_Colour, data = torea_filter_clean_BC5)
+
+summary(te5b)
+anova(te5b)
+summary2way(te5b, page = "nointeraction")
+
+#assumptions test
+coef(te5b)
+#fitted residuals
+plot(te5b, which = 1)
+
+#homoscedasticity
+bp_testb <- bptest(te5b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te5b <- residuals(te5b)
+SWt_te5b <- shapiro.test(residuals_te5b)
+
+#q-q with S-W
+qqnorm(residuals_te5b, main = "Normal Q-Q")
+qqline(residuals_te5b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te5b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te5b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te5b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te5b <- cooks20x(te5b)
+
+hip_te5b <- which(cooks_te5b > 0.4)
+if(length(hip_te5b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te5b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te5b)
+```
+
+```{r}
+#DNA sex only lm for BC~ Iris colour: sex
+torea_filter_clean$Iris_Colour<- as.factor(torea_filter_clean$Iris_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_filter_clean$DNA_sex <- ifelse(torea_filter_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_filter_clean$DNA_sex)
+str(torea_filter_clean)
+
+#clean data
+torea_filter_clean_BC6 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Iris_Colour))
+
+
+#lm
+te6i<- lm(Body_condition_TL~DNA_sex+Iris_Colour+DNA_sex*Iris_Colour, data = torea_filter_clean_BC6)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te6i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te6 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te6
+
+if (lo_te6 == 0) {
+  torea_filter_clean_BC6$Body_condition_TL_transformed <- log(torea_filter_clean_BC6$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC6$Body_condition_TL_transformed <- (torea_filter_clean_BC6$Body_condition_TL^lo_te6 - 1) / lo_te6
+}
+
+te6 <- lm(Body_condition_TL_transformed ~ DNA_sex + Iris_Colour + DNA_sex * Iris_Colour, data = torea_filter_clean_BC6)
+
+summary(te6)
+anova(te6)
+
+#assumptions test
+coef(te6)
+#fitted residuals
+plot(te6, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te6)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te6 <- residuals(te6)
+SWt_te6 <- shapiro.test(residuals_te6)
+
+#q-q with S-W
+qqnorm(residuals_te6, main = "Normal Q-Q")
+qqline(residuals_te6, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te6$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te6$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te6, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te6 <- cooks.distance(te6)
+
+top_te6 <- order(cooks_te6, decreasing = TRUE)[1:3]
+top_values_te6 <- cooks_te6[top_te6]
+
+plot(cooks_te6, type = "h", main = "Cook's Distance", ylab = "Cook's Distance", xlab = "Observation number")
+abline(h = 0.4, col = "red", lty = 2)
+text(top_te6, top_values_te6, labels = top_te6, col = "black", cex = 1)
+
+hip_te6 <- which(cooks_te6 > 0.4)
+if(length(hip_te6) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te6)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te6)
+
+
+
+#reduced model
+te6b <- lm(Body_condition_TL_transformed ~ DNA_sex + Iris_Colour, data = torea_filter_clean_BC6)
+
+summary(te6b)
+anova(te6b)
+#summary2way(te6b, page = "nointeraction")
+
+#assumptions test
+coef(te6b)
+#fitted residuals
+plot(te6b, which = 1)
+
+#homoscedasticity
+bp_testb <- bptest(te6b)
+print(bp_testb)
+
+#normality
+#create shapiro wilks
+residuals_te6b <- residuals(te6b)
+SWt_te6b <- shapiro.test(residuals_te6b)
+
+#q-q with S-W
+qqnorm(residuals_te6b, main = "Normal Q-Q")
+qqline(residuals_te6b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te6b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te6b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te6b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te6b <- cooks.distance(te6b)
+
+top_te6b <- order(cooks_te6b, decreasing = TRUE)[1:3]
+top_values_te6b <- cooks_te6b[top_te6b]
+
+plot(cooks_te6b, type = "h", main = "Cook's Distance", ylab = "Cook's Distance", xlab = "Observation number")
+abline(h = 0.4, col = "red", lty = 2)
+text(top_te6b, top_values_te6b, labels = top_te6b, col = "black", cex = 1)
+
+hip_te6b <- which(cooks_te6b > 0.4)
+if(length(hip_te6b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te6b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te6b)
+
+```
+
+```{r}
+#full lm for iris fleck:sex ~ bC
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+#clean data
+torea_filter_clean_BC7 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Iris_Fleck))
+ 
+#lm
+te7i<- lm(Body_condition_TL~Full_Sex+Iris_Fleck+Full_Sex*Iris_Fleck, data = torea_filter_clean_BC7)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te7i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te7 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te7
+
+if (lo_te7 == 0) {
+  torea_filter_clean_BC7$Body_condition_TL_transformed <- log(torea_filter_clean_BC7$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC7$Body_condition_TL_transformed <- (torea_filter_clean_BC7$Body_condition_TL^lo_te7 - 1) / lo_te7
+}
+
+te7 <- lm(Body_condition_TL_transformed ~ Full_Sex + Iris_Fleck + Full_Sex * Iris_Fleck, data = torea_filter_clean_BC7)
+
+summary(te7)
+
+#assumptions test
+coef(te7)
+#fitted residuals
+plot(te7, which = 1)
+
+#homoscedasticity
+bp_test <- bptest(te7)
+print(bp_test)
+
+#normality
+#create shapiro wilks
+residuals_te7 <- residuals(te7)
+SWt_te7 <- shapiro.test(residuals_te7)
+
+#q-q with S-W
+qqnorm(residuals_te7, main = "Normal Q-Q")
+qqline(residuals_te7, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te7$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te7$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te7, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+
+#points of influence using crooks
+cooks_te7 <- cooks20x(te7)
+
+hip_te7 <- which(cooks_te7 > 0.4)
+if(length(hip_te7) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te7)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te7)
+```
+
+```{r}
+#DNA sex only lm for BC~ Iris fleck: sex
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+
+#combine all unknown DNA sexes into na
+torea_filter_clean$DNA_sex <- ifelse(torea_filter_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_filter_clean$DNA_sex)
+str(torea_data_clean)
+
+#clean data
+torea_filter_clean_BC8 <- torea_filter_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Iris_Fleck))
+
+
+#lm
+te8i<- lm(Body_condition_TL~DNA_sex+Iris_Fleck+DNA_sex*Iris_Fleck, data = torea_filter_clean_BC8)
+
+#mutate to normality box cox
+boxcox_result <- boxcox(te8i, lambda = seq(-2, 2, by = 0.1))
+
+lo_te8 <- boxcox_result$x[which.max(boxcox_result$y)]
+lo_te8
+
+if (lo_te8 == 0) {
+  torea_filter_clean_BC8$Body_condition_TL_transformed <- log(torea_filter_clean_BC8$Body_condition_TL + 1)
+} else {
+  torea_filter_clean_BC8$Body_condition_TL_transformed <- (torea_filter_clean_BC8$Body_condition_TL^lo_te8 - 1) / lo_te8
+}
+
+te8 <- lm(Body_condition_TL_transformed ~ DNA_sex + Iris_Fleck + DNA_sex * Iris_Fleck, data = torea_filter_clean_BC8)
+
+summary(te8)
+anova(te8)
+
+#tukeys
+# Perform Tukey's HSD test on DNA_sex
+tukey_sex <- emmeans(te8, pairwise ~ DNA_sex, adjust = "tukey")
+print(tukey_sex)
+
+# Perform Tukey's HSD test on Iris_Fleck
+tukey_iris <- emmeans(te8, pairwise ~ Iris_Fleck, adjust = "tukey")
+print(tukey_iris)
+
+# Interaction effect post-hoc (optional)
+tukey_interaction <- emmeans(te8, pairwise ~ DNA_sex * Iris_Fleck, adjust = "tukey")
+print(tukey_interaction)
+
+#assumptions test
+coef(te8)
+#fitted residuals
+plot(te8, which = 1)
+
+#normality
+#create shapiro wilks
+residuals_te8 <- residuals(te8)
+SWt_te8 <- shapiro.test(residuals_te8)
+
+#q-q with S-W
+qqnorm(residuals_te8, main = "Normal Q-Q")
+qqline(residuals_te8, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te8$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te8$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te8, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te8 <- cooks20x(te8)
+
+hip_te8 <- which(cooks_te8 > 0.4)
+if(length(hip_te8) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te8)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te8)
+
+
+
+#reduced model
+te8b <- lm(Body_condition_TL_transformed ~ DNA_sex + Iris_Fleck, data = torea_filter_clean_BC8)
+
+summary(te8b)
+anova(te8b)
+summary2way(te8b, page = "nointeraction")
+
+#tukeys
+# Perform Tukey's HSD test on DNA_sex
+tukey_sex <- emmeans(te8b, pairwise ~ DNA_sex, adjust = "tukey")
+print(tukey_sex)
+
+# Perform Tukey's HSD test on Iris_Fleck
+tukey_iris <- emmeans(te8b, pairwise ~ Iris_Fleck, adjust = "tukey")
+print(tukey_iris)
+
+# Interaction effect post-hoc (optional)
+tukey_interaction <- emmeans(te8b, pairwise ~ DNA_sex * Iris_Fleck, adjust = "tukey")
+print(tukey_interaction)
+
+#assumptions test
+coef(te8b)
+#fitted residuals
+plot(te8b, which = 1)
+
+#normality
+#create shapiro wilks
+residuals_te8b <- residuals(te8)
+SWt_te8b <- shapiro.test(residuals_te8)
+
+#q-q with S-W
+qqnorm(residuals_te8b, main = "Normal Q-Q")
+qqline(residuals_te8b, col = "blue")
+usr <- par("usr")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.1, 
+     labels = paste("Shapiro-Wilk W =", round(SWt_te8b$statistic, 3)), 
+     pos = 4, cex = 0.8, col = "red")
+text(x = usr[1] + (usr[2] - usr[1]) * 0.05, y = usr[4] - (usr[4] - usr[3]) * 0.2, 
+     labels = paste("p-value =", format.pval(SWt_te8b$p.value)), 
+     pos = 4, cex = 0.8, col = "red")
+
+#histogram of normal distribution
+
+hist(residuals_te8b, col = "lightblue", probability = TRUE, main = "Histogram of Residuals", xlab = "Residuals", ylab = "Density")
+
+
+#points of influence using crooks
+cooks_te8b <- cooks20x(te8b)
+
+hip_te8b <- which(cooks_te8b > 0.4)
+if(length(hip_te8b) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te8b)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#coliniarity
+vif(te8b)
+```
+
+```{r}
+#test size of iris fleck to sex Full sex data
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+#clean data
+torea_filter_clean_SIF9 <- torea_filter_clean %>%
+  filter(!is.na(Full_Sex) &
+  !is.na(Iris_Fleck))
+ str(torea_filter_clean_SIF9$Full_Sex)
+ str(torea_filter_clean_SIF9$Iris_Fleck)
+#lm
+te9<- glm(Full_Sex~Iris_Fleck, data = torea_filter_clean_SIF9, family = binomial)
+summary(te9)
+
+#assumptions test
+#goodness of fit
+hoslem.test(te9$y, fitted(te9))
+
+#Deviance and AIC
+deviance(te9)
+AIC(te9)
+
+#points of influence using crooks
+cooks_te9 <- cooks20x(te9)
+
+hip_te9 <- which(cooks_te9 > 0.4)
+if(length(hip_te9) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te9)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#ROC and AUC
+roc_te9 <- roc(torea_filter_clean_SIF9$Full_Sex, fitted(te9))
+plot(roc_te9)
+auc(roc_te9)
+
+control_te9 <- trainControl(method = "cv", number = 10)
+model_cte9 <- train(Full_Sex ~ Iris_Fleck, data = torea_filter_clean_SIF9, method = "glm", family = "binomial", trControl = control_te9)
+model_cte9
+
+```
+2x2 chi sqauared - odds ratio 
+
+```{r}
+#test size of iris fleck to sex Full sex data
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+
+#combine all unknown DNA sexes into na
+torea_filter_clean$DNA_sex <- ifelse(torea_filter_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_filter_clean$DNA_sex)
+str(torea_filter_clean)
+
+
+#clean data
+torea_filter_clean_SIF10 <- torea_filter_clean %>%
+  filter(!is.na(DNA_sex) &
+  !is.na(Iris_Fleck))
+ str(torea_filter_clean_SIF10$DNA_Sex)
+ str(torea_filter_clean_SIF10$Iris_Fleck)
+ 
+torea_filter_clean_SIF10$DNA_sex <- as.factor(torea_filter_clean_SIF10$DNA_sex) 
+
+#lm
+te10<- glm(DNA_sex~Iris_Fleck, data = torea_filter_clean_SIF10, family = binomial)
+summary(te10)
+
+#assumptions test
+#goodness of fit
+#goodness of fit not possible with pearsons or HL goodness
+
+#Deviance and AIC
+deviance(te10)
+AIC(te10)
+
+#points of influence using crooks
+cooks_te10 <- cooks20x(te10)
+
+hip_te10 <- which(cooks_te10 > 0.4)
+if(length(hip_te10) > 0) {
+  cat("Data points with Cook's distance greater than 0.4:\n")
+  print(hip_te10)
+} else {
+  cat("No data points with Cook's distance greater than 0.4.\n")
+}
+
+#ROC and AUC
+roc_te10 <- roc(torea_filter_clean_SIF10$Full_Sex, fitted(te10))
+plot(roc_te10)
+auc(roc_te10)
+
+control_te10 <- trainControl(method = "cv", number = 10)
+model_cte10 <- train(Full_Sex ~ Iris_Fleck, data = torea_filter_clean_SIF10, method = "glm", family = "binomial", trControl = control_te10)
+model_cte10
+
+```
+
+````{r}
+#full sex ~ iris fleck chi test
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+#clean data
+torea_filter_clean_SIF9 <- torea_filter_clean %>%
+  filter(!is.na(Full_Sex) &
+  !is.na(Iris_Fleck))
+ str(torea_filter_clean_SIF9$Full_Sex)
+ str(torea_filter_clean_SIF9$Iris_Fleck)
+
+contingency_table <- table(torea_filter_clean_SIF9$Full_Sex, torea_filter_clean_SIF9$Iris_Fleck)
+print(contingency_table)
+
+#chi sqaured 
+chi_square_SIF9 <- chisq.test(contingency_table)
+print(chi_square_SIF9)
+
+#Standard Residuals
+standardized_SIF9 <- chi_square_SIF9$observed - chi_square_SIF9$expected
+standardized_residuals <- standardized_SIF9 / sqrt(chi_square_SIF9$expected)
+print(standardized_residuals)
+
+#Cramers V
+cramer_v <- assocstats(contingency_table)$cramer
+print(paste("Cramér's V:", cramer_v))
+```
+
+
+````{r}
+#full sex ~ iris fleck chi test
+torea_filter_clean$Iris_Fleck<- as.factor(torea_filter_clean$Iris_Fleck)
+
+#clean data
+torea_filter_clean_SIF10 <- torea_filter_clean %>%
+  filter(!is.na(DNA_sex) &
+  !is.na(Iris_Fleck))
+ str(torea_filter_clean_SIF10$Full_Sex)
+ str(torea_filter_clean_SIF10$Iris_Fleck)
+
+contingency_table <- table(torea_filter_clean_SIF10$DNA_sex, torea_filter_clean_SIF10$Iris_Fleck)
+print(contingency_table)
+
+#chi sqaured 
+chi_square_SIF10 <- chisq.test(contingency_table)
+print(chi_square_SIF10)
+
+#Standard Residuals
+standardized_SIF10 <- chi_square_SIF10$observed - chi_square_SIF10$expected
+standardized_residuals <- standardized_SIF10 / sqrt(chi_square_SIF10$expected)
+print(standardized_residuals)
+
+#Cramers V
+cramer_v <- assocstats(contingency_table)$cramer
+print(paste("Cramér's V:", cramer_v))
+```

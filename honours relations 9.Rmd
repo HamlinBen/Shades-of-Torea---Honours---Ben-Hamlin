@@ -1,0 +1,157 @@
+---
+title: "honours relations 9"
+author: "Ben Hamlin"
+date: "2024-09-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+```
+
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_data_berd$DNA_sex <- ifelse(torea_data_berd$DNA_sex %in% c("NO SAMPLE", "X"), "NO SAMPLE", torea_data_berd$DNA_sex)
+torea_data_berd$DNA_sex[is.na(torea_data_berd$DNA_sex)] <- "NO SAMPLE"
+#allows for known sex to always appear on top
+torea_data_berd$alpha <- ifelse(torea_data_berd$DNA_sex %in% c("M", "F"), 1, 0.7)
+#check data import 
+str(torea_data_berd)
+table(torea_data_berd$DNA_sex)
+```
+
+```{r}
+# assessing body condition compared to categorical variables
+
+# Body Condition vs bill colour by sex
+torea_data_berd_vis1 <- torea_data_berd %>%
+  filter(!is.na(Bill_Colour))
+torea_data_berd_vis1$Bill_Colour <- as.factor(torea_data_berd_vis1$Bill_Colour)
+
+anova_bcbc <- aov(Body_condition_TL ~ Bill_Colour, data = torea_data_berd_vis1)
+anova_sum_bcbc <- summary(anova_bcbc)[[1]]
+p_value_bcbc <- anova_sum_bcbc["Bill_Colour", "Pr(>F)"]
+f_value_bcbc <- anova_sum_wbc["Bill_Colour", "F value"]
+anova_text_bcbc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_bcbc, 2), "\n",
+  "p-value = ", format.pval(p_value_bcbc)
+)
+
+ggplot(torea_data_berd_vis1, aes(x = Bill_Colour, y = Body_condition_TL)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Bill Colour", y = "Body Condition", color = "Sex", title = "Torea bill colour vs Body Condition") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_bcbc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Body Condition vs leg colour by sex
+torea_data_berd_vis2 <- torea_data_berd %>%
+  filter(!is.na(Leg_Colour))
+torea_data_berd_vis2$Leg_Colour <- as.factor(torea_data_berd_vis2$Leg_Colour)
+
+anova_bclc <- aov(Body_condition_TL ~ Leg_Colour, data = torea_data_berd_vis2)
+anova_sum_bclc <- summary(anova_bclc)[[1]]
+p_value_bclc <- anova_sum_bclc["Leg_Colour", "Pr(>F)"]
+f_value_bclc <- anova_sum_bclc["Leg_Colour", "F value"]
+anova_text_bclc <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_bclc, 2), "\n",
+  "p-value = ", format.pval(p_value_bclc)
+)
+
+ggplot(torea_data_berd_vis2, aes(x = Leg_Colour, y = Body_condition_TL)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Leg Colour", y = "Body Condition", color = "Sex", title = "Torea leg colour vs Body Condition") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_bclc,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Body Condition vs Iris colour by sex
+torea_data_berd_vis3 <- torea_data_berd %>%
+  filter(!is.na(Iris_Colour))
+torea_data_berd_vis3$Iris_Colour <- as.factor(torea_data_berd_vis3$Iris_Colour)
+
+anova_bcic <- aov(Body_condition_TL ~ Iris_Colour, data = torea_data_berd_vis3)
+anova_sum_bcic <- summary(anova_bcic)[[1]]
+p_value_bcic <- anova_sum_bcic["Iris_Colour", "Pr(>F)"]
+f_value_bcic <- anova_sum_bcic["Iris_Colour", "F value"]
+anova_text_bcic <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_bcic, 2), "\n",
+  "p-value = ", format.pval(p_value_bcic)
+)
+
+ggplot(torea_data_berd_vis3, aes(x = Iris_Colour, y = Body_condition_TL)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Colour", y = "Body Condition", color = "Sex", title = "Torea iris colour vs Body Condition") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_bcic,
+    hjust = 1.1, vjust = 5.3, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Body Condition vs iris fleck by sex
+torea_data_berd_vis4 <- torea_data_berd %>%
+  filter(!is.na(Iris_Fleck))
+torea_data_berd_vis4$Iris_Fleck <- as.factor(torea_data_berd_vis4$Iris_Fleck)
+
+anova_bcif <- aov(Body_condition_TL ~ Iris_Fleck, data = torea_data_berd_vis4)
+anova_sum_bcif <- summary(anova_bcif)[[1]]
+p_value_bcif <- anova_sum_bcif["Iris_Fleck", "Pr(>F)"]
+f_value_bcif <- anova_sum_bcif["Iris_Fleck", "F value"]
+anova_text_bcif <- paste(
+  "ANOVA:\n",
+  "F = ", round(f_value_bcif, 2), "\n",
+  "p-value = ", format.pval(p_value_bcif)
+)
+
+ggplot(torea_data_berd_vis4, aes(x = Iris_Fleck, y = Body_condition_TL)) +
+  geom_jitter(aes(color = DNA_sex,
+             alpha = alpha),
+width = 0.2, size = 3) +
+  scale_color_manual(values = c("M" = "blue", "F" = "red", "NO SAMPLE" = "grey")) +
+  scale_alpha_identity(guide = "none") +
+  labs(x = "Torea Iris Fleck", y = "Body Condition", color = "Sex", title = "Torea iris fleck vs Body Condition") +
+   annotate(
+    "text", 
+    x = Inf, y = Inf, 
+    label = anova_text_bcif,
+    hjust = 1.1, vjust = 5, size = 4,  color = "black", fontface = "italic") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+```

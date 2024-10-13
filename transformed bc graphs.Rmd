@@ -1,0 +1,158 @@
+---
+title: "transformed visualisation"
+author: "Ben Hamlin"
+date: "2024-09-24"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+library(s20x)
+library(car)
+library(ResourceSelection)
+library(caret)
+library(pROC)
+library(nlme)
+library(MASS)
+library(lmtest)
+```
+
+
+```{r}
+#transformed data for visualisation 
+
+ torea_filter_clean$Body_condition_TL_transformed <- (torea_filter_clean$Body_condition_TL^-2 - 1) / -2
+
+torea_filter_clean1 <- torea_filter_clean %>%
+  filter (!is.na(Bill_Colour))
+ggplot(torea_filter_clean1, aes(x = Bill_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Bill Colour", y = "Torea Transformed Body Condition", fill = "Torea Sex", title = "Torea Transformed Body Condition by Bill Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+
+boxplot_data_1 <- torea_filter_clean1 %>%
+  group_by(Bill_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL_transformed, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL_transformed, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL_transformed, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL_transformed, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL_transformed, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_1)
+
+
+torea_filter_clean2 <- torea_filter_clean %>%
+  filter (!is.na(Leg_Colour))
+ggplot(torea_filter_clean2, aes(x = Leg_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Leg Colour", y = "Torea Transformed Body Condition", fill = "Torea Sex", title = "Torea Transformed Body Condition by Leg Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+boxplot_data_2 <- torea_filter_clean2 %>%
+  group_by(Leg_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL_transformed, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL_transformed, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL_transformed, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL_transformed, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL_transformed, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_2)
+
+
+torea_filter_clean3 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Colour))
+torea_filter_clean3$Iris_Colour <- factor(torea_filter_clean3$Iris_Colour, levels = c("Brown-red", "Red", "Bright red scarlet", "Scarlet"))
+ggplot(torea_filter_clean3, aes(x = Iris_Colour, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Colour", y = "Torea Transformed Body Condition", fill = "Torea Sex", title = "Torea Transformed Body Condition by Iris Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+
+boxplot_data_3 <- torea_filter_clean3 %>%
+  group_by(Iris_Colour, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL_transformed, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL_transformed, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL_transformed, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL_transformed, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL_transformed, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_3)
+
+
+
+
+torea_filter_clean4 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck))
+torea_filter_clean4$Iris_Fleck <- factor(torea_filter_clean4$Iris_Fleck, levels = c("Slight", "Fleck"))
+ggplot(torea_filter_clean4, aes(x = Iris_Fleck, y = Body_condition_TL_transformed, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Fleck", y = "Torea Transformed Body Condition", fill = "Torea Sex", title = "Torea Transformed Body Condition by Iris Fleck and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+boxplot_data_4 <- torea_filter_clean4 %>%
+  group_by(Iris_Fleck, Full_Sex) %>%
+  summarise(
+    count=n(),
+    Min = min(Body_condition_TL_transformed, na.rm = TRUE),
+    Q1 = quantile(Body_condition_TL_transformed, 0.25, na.rm = TRUE),
+    Median = median(Body_condition_TL_transformed, na.rm = TRUE),
+    Q3 = quantile(Body_condition_TL_transformed, 0.75, na.rm = TRUE),
+    Max = max(Body_condition_TL_transformed, na.rm = TRUE),
+    .groups = 'drop'
+  )
+print(boxplot_data_4)
+
+
+
+#viewing sex ~ Iris fleck as a stand alone interaction
+#use proportional ammount of sex per iris fleck size
+#clean data
+torea_filter_clean5 <- torea_filter_clean %>%
+  filter (!is.na(Iris_Fleck) &
+  !is.na(Full_Sex))
+torea_filter_clean5$Iris_Fleck <- factor(torea_filter_clean5$Iris_Fleck, levels = c("Slight", "Fleck"))
+
+proportions <- torea_filter_clean5 %>%
+  group_by(Iris_Fleck, Full_Sex) %>%
+  summarise(count = n(), .groups = 'drop') %>%
+  group_by(Iris_Fleck) %>%
+  mutate(proportion = count / sum(count))
+
+total_n <- sum(proportions$count)
+
+
+ggplot(proportions, aes(x = Iris_Fleck, y = proportion, fill = Full_Sex)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  annotate("text", x = 1, y = 1, label = paste("n =", total_n), 
+           hjust = 2, vjust = 1, size = 5, color = "black") +
+  labs(x = "Iris Fleck Size", y = "Proportion of Sex", fill = "Sex", title = "Proportion of Sex by Iris Fleck Size") +
+  theme_minimal()
+
+```

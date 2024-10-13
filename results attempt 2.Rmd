@@ -1,0 +1,219 @@
+---
+title: "linear construction"
+author: "Ben Hamlin"
+date: "2024-09-04"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#library import
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(tidyr)
+library(vcd)
+```
+
+
+```{r}
+#combine all unknown DNA sexes into 1
+torea_data_clean <- torea_data_cor %>% 
+  filter(!is.na(Full_Sex))
+torea_data_clean$Full_Sex <- as.factor(torea_data_clean$Full_Sex)
+as.factor(torea_data_clean$DNA_sex)
+str(torea_data_clean)
+```
+
+```{r}
+torea_data_clean1 <- torea_data_clean %>%
+  filter (!is.na(Bill_Colour))
+ggplot(torea_data_clean1, aes(x = Bill_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Bill Colour", y = "Body Condition", fill = "Sex", title = "Body Condition by Bill Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+torea_data_clean2 <- torea_data_clean %>%
+  filter (!is.na(Leg_Colour))
+ggplot(torea_data_clean2, aes(x = Leg_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Leg Colour", y = "Body Condition", fill = "Sex", title = "Body Condition by Leg Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+torea_data_clean3 <- torea_data_clean %>%
+  filter (!is.na(Iris_Colour))
+torea_data_clean3$Iris_Colour <- factor(torea_data_clean3$Iris_Colour, levels = c("Brown-orange", "Red-orange", "Red", "Bright red scarlet", "Scarlet"))
+ggplot(torea_data_clean3, aes(x = Iris_Colour, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Colour", y = "Body Condition", fill = "Sex", title = "Body Condition by iris Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right", axis.text.x = element_text(angle = 45, hjust = 1))
+
+torea_data_clean4 <- torea_data_clean %>%
+  filter (!is.na(Iris_Fleck))
+torea_data_clean4$Iris_Fleck <- factor(torea_data_clean4$Iris_Fleck, levels = c("None", "Slight", "Fleck"))
+ggplot(torea_data_clean4, aes(x = Iris_Fleck, y = Body_condition_TL, fill = Full_Sex)) +
+  geom_boxplot(alpha = 0.6) +
+  labs(x = "Iris Fleck", y = "Body Condition", fill = "Sex", title = "Body Condition by Iris Colour and Sex") +
+  scale_fill_manual(values = c("M" = "blue", "F" = "red")) +
+  theme_minimal()+
+  theme(legend.position = "right")
+
+
+```
+
+
+```{r}
+#full lm for bill colour:sex ~ bC
+torea_data_clean$Bill_Colour<- as.factor(torea_data_clean$Bill_Colour)
+
+#clean data
+torea_data_clean_BC1 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Bill_Colour))
+ 
+#lm
+te1<- lm(Body_condition_TL~Full_Sex+Bill_Colour+Full_Sex*Bill_Colour, data = torea_data_clean_BC1)
+summary(te1)
+```
+
+```{r}
+#DNA sex only lm for BC~ billcolour: sex
+torea_data_clean$Bill_Colour<- as.factor(torea_data_clean$Bill_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_data_clean$DNA_sex <- ifelse(torea_data_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_data_clean$DNA_sex)
+str(torea_data_clean)
+
+#clean data
+torea_data_clean_BC2 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Bill_Colour))
+
+#confirm na is not included 
+table(torea_data_clean_BC2$DNA_sex)
+
+#lm
+te2<- lm(Body_condition_TL~DNA_sex+Bill_Colour+DNA_sex*Bill_Colour, data = torea_data_clean_BC2)
+summary(te2)
+```
+
+```{r}
+#full lm for leg colour:sex ~ bC
+torea_data_clean$Leg_Colour<- as.factor(torea_data_clean$Leg_Colour)
+
+#clean data
+torea_data_clean_BC3 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Leg_Colour))
+ 
+#lm
+te3<- lm(Body_condition_TL~Full_Sex+Leg_Colour+Full_Sex*Leg_Colour, data = torea_data_clean_BC3)
+summary(te3)
+```
+
+```{r}
+#DNA sex only lm for BC~ Leg colour: sex
+torea_data_clean$Leg_Colour<- as.factor(torea_data_clean$Leg_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_data_clean$DNA_sex <- ifelse(torea_data_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_data_clean$DNA_sex)
+str(torea_data_clean)
+
+#clean data
+torea_data_clean_BC4 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Leg_Colour))
+
+
+#lm
+te4<- lm(Body_condition_TL~DNA_sex+Leg_Colour+DNA_sex*Leg_Colour, data = torea_data_clean_BC4)
+summary(te4)
+```
+
+```{r}
+#full lm for iris colour:sex ~ bC
+torea_data_clean$Leg_Colour<- as.factor(torea_data_clean$Iris_Colour)
+
+#clean data
+torea_data_clean_BC5 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Iris_Colour))
+ 
+#lm
+te5<- lm(Body_condition_TL~Full_Sex+Iris_Colour+Full_Sex*Iris_Colour, data = torea_data_clean_BC5)
+summary(te5)
+```
+
+```{r}
+#DNA sex only lm for BC~ Iris colour: sex
+torea_data_clean$Leg_Colour<- as.factor(torea_data_clean$Iris_Colour)
+
+
+#combine all unknown DNA sexes into na
+torea_data_clean$DNA_sex <- ifelse(torea_data_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_data_clean$DNA_sex)
+str(torea_data_clean)
+
+#clean data
+torea_data_clean_BC6 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Iris_Colour))
+
+
+#lm
+te6<- lm(Body_condition_TL~DNA_sex+Iris_Colour+DNA_sex*Iris_Colour, data = torea_data_clean_BC6)
+summary(te6)
+```
+
+```{r}
+#full lm for iris fleck:sex ~ bC
+torea_data_clean$iris_Fleck<- as.factor(torea_data_clean$Iris_Fleck)
+
+#clean data
+torea_data_clean_BC7 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+  !is.na(Full_Sex) &
+  !is.na(Iris_Fleck))
+ 
+#lm
+te7<- lm(Body_condition_TL~Full_Sex+Iris_Fleck+Full_Sex*Iris_Fleck, data = torea_data_clean_BC7)
+summary(te7)
+```
+
+```{r}
+#DNA sex only lm for BC~ Iris fleck: sex
+torea_data_clean$Iris_Fleck<- as.factor(torea_data_clean$Iris_Fleck)
+
+
+#combine all unknown DNA sexes into na
+torea_data_clean$DNA_sex <- ifelse(torea_data_clean$DNA_sex %in% c("NO SAMPLE", "X"), NA, torea_data_clean$DNA_sex)
+str(torea_data_clean)
+
+#clean data
+torea_data_clean_BC8 <- torea_data_clean %>%
+  filter(!is.na(Body_condition_TL) &
+         !is.na(DNA_sex) &
+         !is.na(Iris_Fleck))
+
+
+#lm
+te8<- lm(Body_condition_TL~DNA_sex+Iris_Fleck+DNA_sex*Iris_Fleck, data = torea_data_clean_BC8)
+summary(te8)
+```
